@@ -1,0 +1,54 @@
+{
+  "skill_name": "ecosystem-audit",
+  "evals": [
+    {
+      "id": 1,
+      "name": "quick-skill-usage-check",
+      "prompt": "how many skills do I have installed and which ones am I actually using?",
+      "expected_output": "A concise summary of installed skill count vs invoked skills, with a ranked list of active skills. Should use parse_skill_usage.py to get real data.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "full-ecosystem-audit",
+      "prompt": "I've been using Claude Code for a month and my ~/.claude directory feels bloated. Can you do a full audit of my ecosystem — skills, memory, handoffs, everything — and tell me what to clean up?",
+      "expected_output": "Complete audit covering all 9 categories (skills, memory, handoffs, ADRs, docs, worktrees, automation, lessons, data provenance). Produces both markdown and interactive HTML report. Prioritized P0/P1/P2 recommendations.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "targeted-worktree-handoff-cleanup",
+      "prompt": "I think I have a bunch of stale worktrees and orphaned handoff files. Can you check and give me a cleanup script?",
+      "expected_output": "Focused audit on worktrees (with lifecycle scoring) and handoffs. Produces ready-to-run cleanup shell script with rm/git worktree remove commands.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "debug-repeated-mistake",
+      "prompt": "I keep getting the same error with BigQuery time travel and I swear I wrote a lesson about this weeks ago. Can you check if my lessons are actually being picked up? It feels like my memory system isn't working",
+      "expected_output": "Diagnostic audit focused on memory/lessons pipeline: grep lessons.md for the topic, check CLAUDE.md retrieval strategy, verify frontmatter, check tier placement. Identifies why the lesson isn't being surfaced.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "debug-skill-not-triggering",
+      "prompt": "I installed the causal-impact-campaign skill but when I ask about running a causal analysis it never fires. I end up having to type /causal-impact-campaign manually every time. What's wrong with my skill setup?",
+      "expected_output": "Diagnostic focused on skill triggering: check skill description for weak/narrow triggers, check for overlap with other skills competing for the same phrases, analyze recent session logs to see what user phrases failed to trigger it. Recommend description optimization.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "debug-skill-overlap",
+      "prompt": "every time I ask to make slides, Claude seems confused about which skill to use — sometimes it uses pptx, sometimes slides, sometimes pptx-generator. Can you figure out why and fix the overlaps?",
+      "expected_output": "Overlap cluster analysis for slide-related skills. Check trigger descriptions, recommend merging/deprecating, suggest schliff:mesh for deeper analysis. Identify which skill should win for which use case.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "debug-memory-not-persisting",
+      "prompt": "I told Claude to remember that we use snake_case for all column names in this project but next session it forgot again. Is my memory system set up correctly? Are my feedback files actually being read?",
+      "expected_output": "Diagnostic audit of memory persistence: check if MEMORY.md index is loaded, verify feedback files have proper frontmatter, check if the project rule was actually written to a file, verify tier placement (should be T2 topic file or CLAUDE.md workflow rule).",
+      "files": []
+    }
+  ]
+}

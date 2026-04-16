@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ecosystem Audit Demo (Synthetic Data)</title>
+<!-- DEMO DATA: all numbers, projects, and findings are synthetic. This is a visual reference template. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0D1117;
+  --surface: #161B22;
+  --surface-alt: #1C2333;
+  --ink: #C9D1D9;
+  --ink-2: #B1BAC4;
+  --ink-3: #8B949E;
+  --ink-4: #484F58;
+  --border: #30363D;
+  --border-strong: #484F58;
+  --green: #2DD4A8;
+  --green-soft: rgba(45,212,168,0.12);
+  --amber: #D29922;
+  --amber-soft: rgba(210,153,34,0.15);
+  --red: #F85149;
+  --red-soft: rgba(248,81,73,0.12);
+  --blue: #58A6FF;
+  --blue-soft: rgba(88,166,255,0.15);
+  --purple: #BC8CFF;
+  --purple-soft: rgba(188,140,255,0.15);
+  --heading: 'Inter', -apple-system, sans-serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --nav-w: 220px;
+  --header-h: 56px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+/* ── Top bar ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+  background: rgba(13,17,23,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border); z-index: 100;
+  display: flex; align-items: center; padding: 0 2rem;
+}
+.topbar-title { font-family: var(--heading); font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem; }
+.topbar-icon { width: 24px; height: 24px; background: var(--green); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--bg); }
+.topbar-title .prompt { color: var(--ink-4); font-size: 0.8rem; font-weight: 400; }
+.topbar-nav { display: flex; gap: 0; margin-left: 2rem; }
+.topbar-nav a { padding: 0 0.75rem; height: var(--header-h); display: flex; align-items: center; font-size: 0.8rem; color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.topbar-nav a:hover { color: var(--ink); }
+.topbar-nav a.active { color: var(--ink); border-bottom-color: var(--green); }
+.topbar-meta { margin-left: auto; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-3); display: flex; gap: 1.5rem; }
+
+/* ── Sidebar nav ── */
+.sidebar {
+  position: fixed; top: var(--header-h); left: 0; bottom: 0;
+  width: var(--nav-w); padding: 1.5rem 1rem;
+  border-right: 1px solid var(--border); background: #0A0E14;
+  overflow-y: auto; z-index: 90;
+}
+.sidebar a {
+  display: block; padding: 0.4rem 0.75rem; margin-bottom: 0.15rem;
+  font-size: 0.78rem; color: var(--ink-3); text-decoration: none;
+  border-radius: 6px; transition: all 0.15s;
+}
+.sidebar a:hover { color: var(--ink); background: var(--surface); }
+.sidebar a.active { color: var(--green); background: var(--green-soft); font-weight: 600; border-left: 2px solid var(--green); }
+.sidebar .nav-group { font-family: var(--mono); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-4); padding: 1rem 0.75rem 0.35rem; }
+.sidebar .nav-group:first-child { padding-top: 0; }
+
+/* ── Main ── */
+main { margin-left: var(--nav-w); padding-top: var(--header-h); }
+.page { max-width: 920px; margin: 0 auto; padding: 0 2.5rem 4rem; }
+
+/* ── Sections ── */
+section { padding: 3rem 0; }
+section + section { border-top: 1px solid var(--border); }
+h2 { font-family: var(--heading); font-size: 1.75rem; font-weight: 400; margin-bottom: 0.25rem; }
+.section-sub { color: var(--ink-3); font-size: 0.88rem; margin-bottom: 2rem; }
+h3 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 2.5rem 0 1rem; }
+h3:first-of-type { margin-top: 0; }
+
+/* ── Hero ── */
+.hero { padding: 3.5rem 0 2rem; border-bottom: none; }
+.hero h1 { font-family: var(--heading); font-size: clamp(2rem, 4.5vw, 2.75rem); font-weight: 400; line-height: 1.15; margin-bottom: 0.75rem; }
+.hero-desc { font-size: 1.05rem; color: var(--ink-2); max-width: 580px; line-height: 1.55; }
+.hero-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+  margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);
+}
+.hero-stat { text-align: center; }
+.hero-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; text-align: left; }
+.hero-stat-label { font-family: var(--mono); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 0.35rem; }
+.hero-stat-num { font-family: var(--heading); font-size: 1.75rem; font-weight: 700; line-height: 1; color: var(--ink); }
+.hero-stat-num .unit { font-size: 1rem; font-weight: 400; color: var(--ink-3); }
+.hero-stat-pct { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-4); margin-top: 0.15rem; }
+.hero-stat-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 0.6rem; overflow: hidden; }
+.hero-stat-bar .fill { height: 100%; background: var(--green); border-radius: 2px; }
+.hero-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--mono); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--green); margin-bottom: 0.75rem; }
+.hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+/* ── Alert banner ── */
+.alert-banner {
+  display: flex; gap: 1rem; padding: 1rem 1.25rem; border-radius: 8px;
+  margin-bottom: 1.5rem; align-items: flex-start; font-size: 0.85rem;
+}
+.alert-banner.critical { background: var(--red-soft); border: 1px solid rgba(248,81,73,0.3); }
+.alert-banner .alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.alert-banner strong { display: block; margin-bottom: 0.15rem; }
+.alert-banner p { color: var(--ink-3); line-height: 1.5; }
+.alert-banner code { font-family: var(--mono); font-size: 0.78rem; background: rgba(255,255,255,0.06); padding: 0.1rem 0.35rem; border-radius: 3px; color: var(--amber); }
+
+/* ── Cards grid ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1.15rem; transition: box-shadow 0.15s;
+}
+.card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-label { font-family: var(--mono); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-4); margin-bottom: 0.35rem; }
+.card-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.35rem; }
+.card-body { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5; }
+.card-footer { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-4); margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.card.priority-p0 { border-left: 3px solid var(--red); }
+.card.priority-p1 { border-left: 3px solid var(--amber); }
+.card.priority-p2 { border-left: 3px solid var(--blue); }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+.tab {
+  padding: 0.6rem 1.1rem; font-size: 0.82rem; font-weight: 500;
+  color: var(--ink-3); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; user-select: none;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Tables ── */
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+thead th {
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-4);
+  text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap; position: sticky; top: var(--header-h); background: var(--bg);
+}
+tbody td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #21262D; color: var(--ink-3); vertical-align: top; }
+tbody tr { transition: background 0.1s; }
+tbody tr:hover { background: var(--surface); }
+td.mono { font-family: var(--mono); font-size: 0.78rem; }
+td code { font-family: var(--mono); font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 0.12rem 0.35rem; border-radius: 3px; color: var(--amber); }
+tr.row-highlight { background: var(--red-soft); }
+tr.row-total { border-top: 2px solid var(--ink); font-weight: 700; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block; font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.03em; padding: 0.15rem 0.45rem; border-radius: 4px;
+}
+.badge-green { background: var(--green-soft); color: var(--green); }
+.badge-amber { background: var(--amber-soft); color: var(--amber); }
+.badge-red { background: var(--red-soft); color: var(--red); }
+.badge-blue { background: var(--blue-soft); color: var(--blue); }
+.badge-purple { background: var(--purple-soft); color: var(--purple); }
+
+/* ── Bar chart ── */
+.bar-chart { margin-top: 0.5rem; }
+.bar-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.3rem; }
+.bar-label { width: 170px; text-align: right; font-family: var(--mono); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.bar-track { flex: 1; height: 20px; background: var(--surface-alt); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); width: 0; }
+.bar-value { font-family: var(--mono); font-weight: 600; font-size: 0.78rem; width: 2rem; text-align: right; }
+
+/* ── Donut ── */
+.chart-row { display: flex; gap: 2.5rem; align-items: flex-start; flex-wrap: wrap; }
+.donut-wrap { width: 200px; height: 200px; position: relative; flex-shrink: 0; }
+.donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; }
+.donut-center .big { font-family: var(--mono); font-size: 1.75rem; font-weight: 600; display: block; }
+.donut-center .small { font-size: 0.7rem; color: var(--ink-3); }
+.legend { flex: 1; min-width: 240px; }
+.legend-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-label { flex: 1; }
+.legend-count { font-family: var(--mono); font-weight: 600; font-size: 0.82rem; }
+.legend-pct { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-4); width: 3rem; text-align: right; }
+
+/* ── Cluster cards ── */
+.clusters { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+.cluster {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
+}
+.cluster-title { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; }
+.cluster-skills { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-3); margin-bottom: 0.5rem; line-height: 1.5; }
+.cluster-rec { font-size: 0.78rem; color: var(--green); font-weight: 600; }
+
+/* ── Code block ── */
+.code-block {
+  background: #0A0E14; color: #E5E5EA; border: 1px solid var(--border); font-family: var(--mono); font-size: 0.75rem;
+  padding: 1.25rem 1.5rem; border-radius: 8px; overflow-x: auto; line-height: 1.7;
+  white-space: pre; margin-top: 0.75rem;
+}
+.code-block .c { color: #6A9955; }
+.code-block .k { color: #DCDCAA; }
+.code-block .s { color: #CE9178; }
+
+/* ── Radar Chart ── */
+.radar-section {
+  display: flex; gap: 2.5rem; align-items: flex-start; flex-wrap: wrap;
+  margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border);
+}
+.radar-wrap { position: relative; flex-shrink: 0; }
+.radar-tooltip {
+  display: none; position: absolute; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.75rem; pointer-events: none;
+  z-index: 10; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.radar-tooltip .tt-label { font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; }
+.radar-tooltip .tt-row { display: flex; gap: 0.5rem; align-items: center; font-family: var(--mono); font-size: 0.7rem; }
+.radar-tooltip .tt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.radar-legend { flex: 1; min-width: 240px; }
+.radar-legend-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; }
+.radar-legend-items { display: flex; gap: 1.25rem; margin-bottom: 1.25rem; }
+.radar-legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--ink-3); }
+.radar-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.radar-details { display: flex; flex-direction: column; gap: 0.5rem; }
+.radar-detail-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; }
+.radar-detail-label { width: 70px; color: var(--ink-3); font-size: 0.78rem; }
+.radar-detail-val { font-family: var(--mono); font-weight: 600; width: 3rem; text-align: right; font-size: 0.8rem; }
+.radar-detail-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.radar-detail-bar span { display: block; height: 100%; border-radius: 2px; }
+
+/* ── Footer ── */
+footer { padding: 3rem 0; text-align: center; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-4); border-top: 1px solid var(--border); }
+
+/* ── Responsive ── */
+@media (max-width: 840px) {
+  .sidebar { display: none; }
+  main { margin-left: 0; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+  .topbar-meta { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-title">
+    <div class="topbar-icon">EA</div>
+    Ecosystem Audit
+    <span class="prompt">&middot; Session N</span>
+  </div>
+  <nav class="topbar-nav">
+    <a href="#hero" class="active">Overview</a>
+    <a href="#skills">Skills</a>
+    <a href="#handoffs">Handoffs</a>
+    <a href="#recommendations">Actions</a>
+  </nav>
+  <div class="topbar-meta">
+    <span>YYYY-MM-DD</span>
+    <span>996 artifacts</span>
+    <span>9 projects</span>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="nav-group">Overview</div>
+  <a href="#hero" class="active">Summary</a>
+  <a href="#critical">Critical Findings</a>
+  <div class="nav-group">Phase 1</div>
+  <a href="#skills">Skills (394)</a>
+  <a href="#overlaps">Trigger Overlaps</a>
+  <a href="#memory">Memory &amp; Lessons</a>
+  <div class="nav-group">Phase 2</div>
+  <a href="#handoffs">Handoffs (313)</a>
+  <a href="#adrs">ADRs &amp; Docs (80)</a>
+  <a href="#cross-project">Cross-Project (185)</a>
+  <a href="#worktrees">Worktrees &amp; Automation</a>
+  <div class="nav-group">Actions</div>
+  <a href="#recommendations">Recommendations</a>
+  <a href="#script">Cleanup Script</a>
+  <a href="#grand-summary">Grand Summary</a>
+</nav>
+
+<main><div class="page">
+
+  <!-- ═══ Hero ═══ -->
+  <section class="hero" id="hero">
+    <div class="hero-badge"><span class="dot"></span> Full Coverage &middot; Complete</div>
+    <h1>Claude Code Ecosystem Audit</h1>
+    <p class="hero-desc">Full-coverage analysis of skills, memory, handoffs, ADRs, automation, and worktrees across 9 projects and 289 sessions.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-label">Total Artifacts</div>
+        <div class="hero-stat-num" data-target="996">0</div>
+        <div class="hero-stat-bar"><div class="fill" style="width:100%"></div></div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">Keep</div>
+        <div class="hero-stat-num" data-target="444">0<span class="unit">/ 996</span></div>
+        <div class="hero-stat-pct">45%</div>
+        <div class="hero-stat-bar"><div class="fill" style="width:45%"></div></div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">Delete</div>
+        <div class="hero-stat-num" data-target="348">0</div>
+        <div class="hero-stat-pct">35%</div>
+        <div class="hero-stat-bar"><div class="fill" style="width:35%;background:var(--red)"></div></div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">Archive</div>
+        <div class="hero-stat-num" data-target="181">0</div>
+        <div class="hero-stat-pct">18%</div>
+        <div class="hero-stat-bar"><div class="fill" style="width:18%;background:var(--amber)"></div></div>
+      </div>
+    </div>
+
+    <!-- Radar Chart -->
+    <div class="radar-section">
+      <div class="radar-wrap">
+        <canvas id="radarChart" width="380" height="380"></canvas>
+        <div class="radar-tooltip" id="radarTooltip"></div>
+      </div>
+      <div class="radar-legend">
+        <div class="radar-legend-title">Utilization by Category</div>
+        <div class="radar-legend-items">
+          <div class="radar-legend-item"><span class="radar-dot" style="background:var(--green)"></span> Active / Healthy</div>
+          <div class="radar-legend-item"><span class="radar-dot" style="background:var(--red);opacity:0.5"></span> Dormant / Stale</div>
+        </div>
+        <div class="radar-details" id="radarDetails">
+          <div class="radar-detail-row"><span class="radar-detail-label">Skills</span><span class="radar-detail-val">8.9%</span><span class="radar-detail-bar"><span style="width:8.9%;background:var(--green)"></span></span></div>
+          <div class="radar-detail-row"><span class="radar-detail-label">Memory</span><span class="radar-detail-val">47%</span><span class="radar-detail-bar"><span style="width:47%;background:var(--green)"></span></span></div>
+          <div class="radar-detail-row"><span class="radar-detail-label">Handoffs</span><span class="radar-detail-val">2.9%</span><span class="radar-detail-bar"><span style="width:2.9%;background:var(--green)"></span></span></div>
+          <div class="radar-detail-row"><span class="radar-detail-label">ADRs</span><span class="radar-detail-val">60%</span><span class="radar-detail-bar"><span style="width:60%;background:var(--green)"></span></span></div>
+          <div class="radar-detail-row"><span class="radar-detail-label">Docs</span><span class="radar-detail-val">16%</span><span class="radar-detail-bar"><span style="width:16%;background:var(--green)"></span></span></div>
+          <div class="radar-detail-row"><span class="radar-detail-label">Worktrees</span><span class="radar-detail-val">40%</span><span class="radar-detail-bar"><span style="width:40%;background:var(--green)"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Critical Findings ═══ -->
+  <section id="critical">
+    <h2>Critical Findings</h2>
+    <p class="section-sub">Two issues requiring immediate attention.</p>
+
+    <div class="alert-banner critical">
+      <span class="alert-icon">!</span>
+      <div>
+        <strong>API Key Exposed in SaaS-Conv .env</strong>
+        <p>Plaintext <code>API_KEY</code> at <code>~/.claude/projects/.../memory/.env</code>. Permissions are 600 but it sits in a dotfile directory. Rotate key immediately, move to macOS Keychain or Secret Manager.</p>
+      </div>
+    </div>
+    <div class="alert-banner critical">
+      <span class="alert-icon">!</span>
+      <div>
+        <strong>update_memory.py: 73% Failure Rate</strong>
+        <p>launchd runs 4x/day but only 27% of 232 runs succeeded. <code>MAX_TOKENS = 8192</code> is too small for 506-line MEMORY.md response &mdash; truncated mid-JSON every run. Burning ~39K input tokens per failed Sonnet call.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Skills ═══ -->
+  <section id="skills">
+    <h2>Skills</h2>
+    <p class="section-sub">394 installed, 35 invoked (8.9% utilization). 157 safe to remove immediately.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="skills-chart">Classification</div>
+      <div class="tab" data-tab="skills-top">Top Skills</div>
+      <div class="tab" data-tab="skills-table">Full Breakdown</div>
+    </div>
+
+    <div class="tab-panel active" id="skills-chart">
+      <div class="chart-row">
+        <div class="donut-wrap">
+          <svg viewBox="0 0 200 200" width="200" height="200">
+            <circle cx="100" cy="100" r="78" fill="none" stroke="#21262D" stroke-width="22"/>
+            <circle cx="100" cy="100" r="78" fill="none" stroke="var(--green)" stroke-width="22" stroke-dasharray="43.6 446.5" stroke-dashoffset="122.5"/>
+            <circle cx="100" cy="100" r="78" fill="none" stroke="var(--blue)" stroke-width="22" stroke-dasharray="263.2 226.9" stroke-dashoffset="78.9"/>
+            <circle cx="100" cy="100" r="78" fill="none" stroke="var(--amber)" stroke-width="22" stroke-dasharray="132.7 357.4" stroke-dashoffset="-184.3"/>
+            <circle cx="100" cy="100" r="78" fill="none" stroke="var(--purple)" stroke-width="22" stroke-dasharray="41.2 448.9" stroke-dashoffset="-317"/>
+            <circle cx="100" cy="100" r="78" fill="none" stroke="var(--red)" stroke-width="22" stroke-dasharray="21 469.1" stroke-dashoffset="-358.2"/>
+          </svg>
+          <div class="donut-center"><span class="big">8.9%</span><span class="small">utilization</span></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div><span class="legend-label">Active</span><span class="legend-count">35</span><span class="legend-pct">8.9%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div><span class="legend-label">Relevant-Dormant</span><span class="legend-count">212</span><span class="legend-pct">53.7%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div><span class="legend-label">Niche-Dormant</span><span class="legend-count">107</span><span class="legend-pct">27.1%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div><span class="legend-label">DevOps-Dormant</span><span class="legend-count">33</span><span class="legend-pct">8.4%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div><span class="legend-label">Not-a-Skill / Deprecated</span><span class="legend-count">17</span><span class="legend-pct">4.3%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="skills-top">
+      <div class="bar-chart">
+        <div class="bar-row"><span class="bar-label">claudeception</span><div class="bar-track"><div class="bar-fill" data-width="100" style="background:var(--ink)"></div></div><span class="bar-value">38</span></div>
+        <div class="bar-row"><span class="bar-label">review-toolkit</span><div class="bar-track"><div class="bar-fill" data-width="94.7" style="background:var(--ink)"></div></div><span class="bar-value">36</span></div>
+        <div class="bar-row"><span class="bar-label">session-handoff</span><div class="bar-track"><div class="bar-fill" data-width="92.1" style="background:var(--ink)"></div></div><span class="bar-value">35</span></div>
+        <div class="bar-row"><span class="bar-label">publish-skill</span><div class="bar-track"><div class="bar-fill" data-width="42.1" style="background:var(--ink-2)"></div></div><span class="bar-value">16</span></div>
+        <div class="bar-row"><span class="bar-label">plan-review-integrator</span><div class="bar-track"><div class="bar-fill" data-width="31.6" style="background:var(--ink-2)"></div></div><span class="bar-value">12</span></div>
+        <div class="bar-row"><span class="bar-label">frontend-design</span><div class="bar-track"><div class="bar-fill" data-width="26.3" style="background:var(--ink-2)"></div></div><span class="bar-value">10</span></div>
+        <div class="bar-row"><span class="bar-label">brainstorming</span><div class="bar-track"><div class="bar-fill" data-width="23.7" style="background:var(--ink-3)"></div></div><span class="bar-value">9</span></div>
+        <div class="bar-row"><span class="bar-label">skill-creator</span><div class="bar-track"><div class="bar-fill" data-width="18.4" style="background:var(--ink-3)"></div></div><span class="bar-value">7</span></div>
+        <div class="bar-row"><span class="bar-label">update-config</span><div class="bar-track"><div class="bar-fill" data-width="18.4" style="background:var(--ink-3)"></div></div><span class="bar-value">7</span></div>
+        <div class="bar-row"><span class="bar-label">find-skills</span><div class="bar-track"><div class="bar-fill" data-width="13.2" style="background:var(--ink-4)"></div></div><span class="bar-value">5</span></div>
+        <div class="bar-row"><span class="bar-label">schliff:analyze</span><div class="bar-track"><div class="bar-fill" data-width="13.2" style="background:var(--ink-4)"></div></div><span class="bar-value">5</span></div>
+        <div class="bar-row"><span class="bar-label">ai-trust-evaluation</span><div class="bar-track"><div class="bar-fill" data-width="13.2" style="background:var(--ink-4)"></div></div><span class="bar-value">5</span></div>
+      </div>
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--ink-4);margin-top:0.75rem;">+ 23 more skills with 1&ndash;3 invocations each</p>
+    </div>
+
+    <div class="tab-panel" id="skills-table">
+      <table>
+        <thead><tr><th>Category</th><th>Count</th><th>%</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Active</td><td class="mono">35</td><td class="mono">8.9%</td><td><span class="badge badge-green">Keep</span></td></tr>
+          <tr><td>Relevant-Dormant</td><td class="mono">212</td><td class="mono">53.7%</td><td><span class="badge badge-green">Keep</span> review triggers</td></tr>
+          <tr><td>Niche-Dormant (bio/quantum)</td><td class="mono">107</td><td class="mono">27.1%</td><td><span class="badge badge-red">Uninstall</span></td></tr>
+          <tr><td>DevOps-Dormant (IaC/CI)</td><td class="mono">33</td><td class="mono">8.4%</td><td><span class="badge badge-red">Uninstall</span></td></tr>
+          <tr><td>Not-a-Skill (repos, workspaces)</td><td class="mono">14</td><td class="mono">3.5%</td><td><span class="badge badge-red">Clean up</span></td></tr>
+          <tr><td>Deprecated (merged into other skills)</td><td class="mono">3</td><td class="mono">0.8%</td><td><span class="badge badge-red">Remove</span></td></tr>
+          <tr><td>Adware (offer-k-dense-web)</td><td class="mono">1</td><td class="mono">0.3%</td><td><span class="badge badge-red">Remove</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ Overlaps ═══ -->
+  <section id="overlaps">
+    <h2>Trigger Overlaps</h2>
+    <p class="section-sub">10 clusters where multiple skills compete for the same phrases.</p>
+    <div class="clusters">
+      <div class="cluster"><div class="cluster-title">Writing</div><div class="cluster-skills">paper-write, paper-writing, scientific-writing, writing</div><div class="cluster-rec">Keep paper-writing + writing</div></div>
+      <div class="cluster"><div class="cluster-title">Slides / PPTX</div><div class="cluster-skills">pptx, pptx-generator, slides, pptx-posters, scientific-slides, paper-slides</div><div class="cluster-rec">Keep pptx + slides</div></div>
+      <div class="cluster"><div class="cluster-title">arXiv</div><div class="cluster-skills">arxiv, arxiv-database</div><div class="cluster-rec">Keep arxiv (has PDF download)</div></div>
+      <div class="cluster"><div class="cluster-title">Git Worktree</div><div class="cluster-skills">git-worktree, using-git-worktrees</div><div class="cluster-rec">Keep using-git-worktrees</div></div>
+      <div class="cluster"><div class="cluster-title">Auto-Review</div><div class="cluster-skills">auto-review-loop, auto-review-loop-llm, auto-review-loop-minimax</div><div class="cluster-rec">Keep loop + llm variant</div></div>
+      <div class="cluster"><div class="cluster-title">LFG</div><div class="cluster-skills">lfg, slfg</div><div class="cluster-rec">Keep slfg (superset)</div></div>
+      <div class="cluster"><div class="cluster-title">CE Work</div><div class="cluster-skills">ce-work, ce-work-beta</div><div class="cluster-rec">Merge beta into ce-work</div></div>
+      <div class="cluster"><div class="cluster-title">Brainstorming</div><div class="cluster-skills">brainstorming, scientific-brainstorming, ce-brainstorm</div><div class="cluster-rec">Keep brainstorming (active)</div></div>
+      <div class="cluster"><div class="cluster-title">Image Gen</div><div class="cluster-skills">generate-image, gemini-imagegen</div><div class="cluster-rec">Keep both (different backends)</div></div>
+      <div class="cluster"><div class="cluster-title">Research</div><div class="cluster-skills">deep-research, parallel-web, perplexity-search, research-lookup</div><div class="cluster-rec">Keep all (complementary)</div></div>
+    </div>
+  </section>
+
+  <!-- ═══ Memory ═══ -->
+  <section id="memory">
+    <h2>Memory &amp; Lessons</h2>
+    <p class="section-sub">19 memory files in the primary project. 6 feedback files, all with valid frontmatter.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="mem-files">Files</div>
+      <div class="tab" data-tab="mem-lessons">Lessons &amp; Axioms</div>
+    </div>
+
+    <div class="tab-panel active" id="mem-files">
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Sessions</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><code>project_2026_goals</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">6</td><td>Keep</td></tr>
+          <tr><td><code>project_ccaf_study</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">2</td><td>Keep (exam May 1)</td></tr>
+          <tr><td><code>project_adaptive_study_tool</code></td><td><span class="badge badge-amber">Behind</span></td><td class="mono">2</td><td>Update</td></tr>
+          <tr><td><code>feedback_schliff_composability</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">6</td><td>Keep</td></tr>
+          <tr><td><code>feedback_ab_test_skill_changes</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">6</td><td>Keep</td></tr>
+          <tr><td><code>feedback_version_bump_checklist</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">5</td><td>Keep</td></tr>
+          <tr><td><code>feedback_schliff_trim_constraints</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">5</td><td>Keep</td></tr>
+          <tr><td><code>feedback_phase_numbering</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">4</td><td>Keep</td></tr>
+          <tr><td><code>feedback_voltagent_patterns</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">3</td><td>Keep</td></tr>
+          <tr><td><code>reference_autoresearch_tools</code></td><td><span class="badge badge-green">Active</span></td><td class="mono">10</td><td>Keep</td></tr>
+          <tr><td><code>reference_awesome_cc_scan</code></td><td><span class="badge badge-amber">Stale</span></td><td class="mono">9</td><td>Update or archive</td></tr>
+          <tr><td><code>project_subagent_parallel</code></td><td><span class="badge badge-blue">Done</span></td><td class="mono">10</td><td>Archive</td></tr>
+          <tr><td><code>project_portfolio_migration</code></td><td><span class="badge badge-blue">Done</span></td><td class="mono">1</td><td>Archive</td></tr>
+          <tr><td><code>project_agent_review_v26</code></td><td><span class="badge badge-red">Severely stale</span></td><td class="mono">6</td><td>Rewrite or archive</td></tr>
+          <tr><td><code>project_autoresearch_saas-conv</code></td><td><span class="badge badge-amber">Stale</span></td><td class="mono">9</td><td>Mark deferred</td></tr>
+          <tr><td><code>project_aris_install</code></td><td><span class="badge badge-amber">Stale</span></td><td class="mono">7</td><td>Add note</td></tr>
+          <tr><td><code>project_tier1_tools</code></td><td><span class="badge badge-amber">Stale</span></td><td class="mono">9</td><td>Add date note</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="mem-lessons">
+      <table>
+        <thead><tr><th>Store</th><th>Entries</th><th>Lines</th><th>Issues</th></tr></thead>
+        <tbody>
+          <tr><td>axioms.md</td><td class="mono">18</td><td class="mono">52</td><td><span class="badge badge-green">Clean</span></td></tr>
+          <tr><td>lessons.md (global)</td><td class="mono">158</td><td class="mono">1,406</td><td>14 suffixed entries out-of-order; 3 gaps</td></tr>
+          <tr><td>SaaS-Conv lessons</td><td class="mono">88</td><td class="mono">913</td><td>Properly scoped</td></tr>
+          <tr><td>Retail lessons</td><td class="mono">222</td><td class="mono">1,012</td><td>Properly scoped; 59 memory files</td></tr>
+          <tr class="row-total"><td>Combined</td><td class="mono">486</td><td class="mono">3,383</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ Handoffs ═══ -->
+  <section id="handoffs">
+    <h2>Session Handoffs</h2>
+    <p class="section-sub">313 files across 3 projects. 292 are archivable or deletable. 167 are worktree duplicates.</p>
+    <table>
+      <thead><tr><th>Project</th><th>Total</th><th>Historical</th><th>Orphaned</th><th>Current</th><th>Archivable</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Retail</strong></td><td class="mono">67</td><td class="mono">51</td><td class="mono">5</td><td class="mono">5</td><td class="mono">56</td></tr>
+        <tr><td><strong>Sample-Deck</strong></td><td class="mono">10</td><td class="mono">9</td><td class="mono">1</td><td class="mono">0</td><td class="mono">10</td></tr>
+        <tr><td><strong>SaaS-Conv (main)</strong></td><td class="mono">69</td><td class="mono">54</td><td class="mono">5</td><td class="mono">4</td><td class="mono">60</td></tr>
+        <tr class="row-highlight"><td><strong>SaaS-Conv (3 worktrees)</strong></td><td class="mono">167</td><td class="mono">167</td><td class="mono">&mdash;</td><td class="mono">0</td><td class="mono">167</td></tr>
+        <tr class="row-total"><td><strong>Total</strong></td><td class="mono">313</td><td class="mono">281</td><td class="mono">11</td><td class="mono">9</td><td class="mono">293</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══ ADRs ═══ -->
+  <section id="adrs">
+    <h2>ADRs &amp; Documentation</h2>
+    <p class="section-sub">80 files across 5 categories. ADR data integrity issues found.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="adr-issues">ADR Issues</div>
+      <div class="tab" data-tab="adr-class">Classification</div>
+    </div>
+
+    <div class="tab-panel active" id="adr-issues">
+      <table>
+        <thead><tr><th>Issue</th><th>Severity</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>ADR-0014 duplicate of ADR-0012</td><td><span class="badge badge-red">P0</span></td><td>File <code>0014-a24-enriched-primary-spec.md</code> has identical content to ADR-0012 (A10b). Copy-paste error.</td></tr>
+          <tr><td>19 broken links in README</td><td><span class="badge badge-red">P0</span></td><td>Shortened filenames in README don&rsquo;t match actual files. 19 of 35 links broken.</td></tr>
+          <tr><td>ADR-0010 not marked Superseded</td><td><span class="badge badge-amber">P1</span></td><td>Still says &ldquo;Accepted&rdquo; despite being superseded by ADR-0012.</td></tr>
+          <tr><td>ADR-0017, 0026 still Proposed</td><td><span class="badge badge-amber">P1</span></td><td>Both superseded by SCA (ADR-0018/0021). Should be Superseded.</td></tr>
+          <tr><td>ADR-0025 status mismatch</td><td><span class="badge badge-blue">P2</span></td><td>README says &ldquo;Identified&rdquo;, file says &ldquo;Resolved&rdquo;.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="adr-class">
+      <table>
+        <thead><tr><th>Category</th><th>Total</th><th>Active</th><th>Historical</th><th>Stale</th></tr></thead>
+        <tbody>
+          <tr><td>ADRs</td><td class="mono">35</td><td class="mono">23</td><td class="mono">9</td><td class="mono">3</td></tr>
+          <tr><td>Plans</td><td class="mono">11</td><td class="mono">4</td><td class="mono">7</td><td class="mono">0</td></tr>
+          <tr><td>Reviews</td><td class="mono">17</td><td class="mono">3</td><td class="mono">14</td><td class="mono">0</td></tr>
+          <tr><td>Findings</td><td class="mono">8</td><td class="mono">0</td><td class="mono">8</td><td class="mono">0</td></tr>
+          <tr><td>Tasks</td><td class="mono">9</td><td class="mono">0</td><td class="mono">7</td><td class="mono">2</td></tr>
+          <tr class="row-total"><td>Total</td><td class="mono">80</td><td class="mono">30</td><td class="mono">45</td><td class="mono">5</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ Cross-Project ═══ -->
+  <section id="cross-project">
+    <h2>Cross-Project Memory</h2>
+    <p class="section-sub">185 memory files across 9 projects, totaling 1.49 MB.</p>
+    <table>
+      <thead><tr><th>Project</th><th>Files</th><th>Disk</th><th>Status</th><th>Key Issue</th></tr></thead>
+      <tbody>
+        <tr class="row-highlight"><td><strong>SaaS-Conv</strong></td><td class="mono">56</td><td class="mono">688 KB</td><td><span class="badge badge-red">P0</span></td><td>API key in .env; 73% script failure; MEMORY.md 506 lines; 13 stale checkpoints</td></tr>
+        <tr><td><strong>Retail</strong></td><td class="mono">59</td><td class="mono">488 KB</td><td><span class="badge badge-amber">P1</span></td><td>40 feedback files; 4 standalone sessions to merge</td></tr>
+        <tr><td><strong>Documents</strong></td><td class="mono">18</td><td class="mono">72 KB</td><td><span class="badge badge-green">OK</span></td><td>Already audited</td></tr>
+        <tr><td><strong>review-toolkit</strong></td><td class="mono">15</td><td class="mono">96 KB</td><td><span class="badge badge-blue">P2</span></td><td>1 shipped file still present</td></tr>
+        <tr><td><strong>sample-deck</strong></td><td class="mono">14</td><td class="mono">56 KB</td><td><span class="badge badge-green">Active</span></td><td>Deadline tomorrow &mdash; leave alone</td></tr>
+        <tr><td><strong>home (~)</strong></td><td class="mono">9</td><td class="mono">36 KB</td><td><span class="badge badge-blue">P2</span></td><td>1 duplicate feedback file</td></tr>
+        <tr><td><strong>sample-b</strong></td><td class="mono">7</td><td class="mono">28 KB</td><td><span class="badge badge-green">OK</span></td><td>Dormant, small footprint</td></tr>
+        <tr><td><strong>Client-C-handover</strong></td><td class="mono">4</td><td class="mono">16 KB</td><td><span class="badge badge-blue">Done</span></td><td>Completed project, archive entirely</td></tr>
+        <tr><td><strong>int-causal-impact</strong></td><td class="mono">3</td><td class="mono">12 KB</td><td><span class="badge badge-red">Redundant</span></td><td>Duplicate of Retail &mdash; delete all 3 files</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══ Worktrees ═══ -->
+  <section id="worktrees">
+    <h2>Worktrees &amp; Automation</h2>
+    <p class="section-sub">12 stale worktrees consuming 154 MB. Data provenance files are healthy.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="wt-list">Worktrees</div>
+      <div class="tab" data-tab="wt-auto">Automation</div>
+    </div>
+
+    <div class="tab-panel active" id="wt-list">
+      <table>
+        <thead><tr><th>Repo</th><th>Count</th><th>Disk</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>review-toolkit</td><td class="mono">8</td><td class="mono">75 MB</td><td>All branches merged. <code>eloquent-clarke</code> (57 MB) is largest.</td></tr>
+          <tr><td>SaaS-Conv</td><td class="mono">3</td><td class="mono">45 MB</td><td>Completed feature branches (S77-78b, merged)</td></tr>
+          <tr><td>marketing-dashboard</td><td class="mono">1</td><td class="mono">21 MB</td><td>Stale 36 days, clean</td></tr>
+          <tr><td>Retail</td><td class="mono">1</td><td class="mono">18 MB</td><td>Duplicate data/provenance files</td></tr>
+          <tr class="row-total"><td>Total</td><td class="mono">13</td><td class="mono">~154 MB</td><td>All reclaimable</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="wt-auto">
+      <table>
+        <thead><tr><th>Component</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td><code>update_memory.py</code></td><td><span class="badge badge-red">Failing</span></td><td>73% failure rate. MAX_TOKENS=8192 too small.</td></tr>
+          <tr><td>launchd job</td><td><span class="badge badge-amber">Running</span></td><td>4x/day weekdays. Exit code 1 (last failed).</td></tr>
+          <tr><td><code>.env</code></td><td><span class="badge badge-red">Risk</span></td><td>Plaintext API key. chmod 600.</td></tr>
+          <tr><td>Scheduled tasks</td><td><span class="badge badge-green">N/A</span></td><td>No Claude scheduled tasks configured.</td></tr>
+          <tr><td>Data provenance</td><td><span class="badge badge-green">Healthy</span></td><td>4 files, all valid, sources active.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ Recommendations ═══ -->
+  <section id="recommendations">
+    <h2>Recommendations</h2>
+    <p class="section-sub">All actions unified by priority across both audit phases.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="rec-p0">P0 &mdash; Now</div>
+      <div class="tab" data-tab="rec-p1">P1 &mdash; This Week</div>
+      <div class="tab" data-tab="rec-p2">P2 &mdash; This Month</div>
+    </div>
+
+    <div class="tab-panel active" id="rec-p0">
+      <div class="cards">
+        <div class="card priority-p0"><div class="card-label">Security</div><div class="card-title">Rotate API key in SaaS-Conv .env</div><div class="card-body">Plaintext <code>[REDACTED]</code>. Move to Keychain or Secret Manager.</div><div class="card-footer">Impact: Eliminate security risk</div></div>
+        <div class="card priority-p0"><div class="card-label">Broken</div><div class="card-title">Fix update_memory.py token limit</div><div class="card-body">Change MAX_TOKENS 8192 &rarr; 16384+. Trim MEMORY.md from 506 to ~100 lines.</div><div class="card-footer">Impact: Fix 73% failure rate</div></div>
+        <div class="card priority-p0"><div class="card-label">Data integrity</div><div class="card-title">Fix ADR-0014 duplicate content</div><div class="card-body">File is a copy-paste of ADR-0012. Write real A24 content or delete.</div><div class="card-footer">Impact: Fix corrupted ADR</div></div>
+        <div class="card priority-p0"><div class="card-label">Data integrity</div><div class="card-title">Fix 19 broken ADR README links</div><div class="card-body">Shortened filenames don&rsquo;t match actual files. Update all links.</div><div class="card-footer">Impact: Fix navigability</div></div>
+        <div class="card priority-p0"><div class="card-label">Skills</div><div class="card-title">Remove deprecated + adware skills</div><div class="card-body">3 deprecated (merged into causal-impact-campaign) + offer-k-dense-web (adware).</div><div class="card-footer">Impact: Remove dead code + stop injection</div></div>
+        <div class="card priority-p0"><div class="card-label">Skills</div><div class="card-title">Clean 14 non-skill entries</div><div class="card-body">.DS_Store, README_TEMPLATE.md, 5 workspace dirs, 5 cloned repos.</div><div class="card-footer">Impact: Reduce noise</div></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="rec-p1">
+      <div class="cards">
+        <div class="card priority-p1"><div class="card-label">Skills</div><div class="card-title">Uninstall 107 niche-dormant skills</div><div class="card-body">Bio/chem databases, quantum computing, wet-lab integrations. ~27% reduction.</div><div class="card-footer">Impact: Faster skill loading</div></div>
+        <div class="card priority-p1"><div class="card-label">Skills</div><div class="card-title">Uninstall 33 devops-dormant skills</div><div class="card-body">Terraform, Helm, K8s, Ansible generators and validators.</div><div class="card-footer">Impact: ~8% reduction</div></div>
+        <div class="card priority-p1"><div class="card-label">Worktrees</div><div class="card-title">Clean 9 stale worktrees (score: 40%)</div><div class="card-body">6 on merged branches (NEEDS_CLEANUP), 3 abandoned &gt;14 days (ABANDONED). 3 SaaS-Conv worktrees are actively used (EXPECTED). Reclaims ~124 MB.</div><div class="card-footer">Impact: Lifecycle score 40% &rarr; 100%</div></div>
+        <div class="card priority-p1"><div class="card-label">Memory</div><div class="card-title">Archive 13 SaaS-Conv session checkpoints</div><div class="card-body">All from Mar 3-23, superseded by MEMORY.md and sessions_archive.</div><div class="card-footer">Impact: 100 KB, reduce clutter</div></div>
+        <div class="card priority-p1"><div class="card-label">Handoffs</div><div class="card-title">Delete 167 worktree handoff duplicates</div><div class="card-body">3 SaaS-Conv worktrees each have near-complete copies of handoffs.</div><div class="card-footer">Impact: 1.8 MB pure waste</div></div>
+        <div class="card priority-p1"><div class="card-label">Handoffs</div><div class="card-title">Delete 11 orphaned prompts</div><div class="card-body">Session prompts never used or produced non-standard output.</div><div class="card-footer">Impact: Reduce confusion</div></div>
+        <div class="card priority-p1"><div class="card-label">ADRs</div><div class="card-title">Update ADR supersession chains</div><div class="card-body">Mark 0010, 0017, 0026 as Superseded. Fix 0025 status mismatch.</div><div class="card-footer">Impact: ADR integrity</div></div>
+        <div class="card priority-p1"><div class="card-label">Memory</div><div class="card-title">Merge Retail standalone session files</div><div class="card-body">session18/19/20 + sessions_8_17_summary into archive.</div><div class="card-footer">Impact: 4 files consolidated</div></div>
+        <div class="card priority-p1"><div class="card-label">Hygiene</div><div class="card-title">Prune axioms.md from 18 to 12</div><div class="card-body">18 items exceeds Cowan cap of 12. Identify 6 least-triggered axioms to demote back to lessons.md.</div><div class="card-footer">Impact: Reduce cognitive load on every session</div></div>
+        <div class="card priority-p1"><div class="card-label">Hygiene</div><div class="card-title">Add frontmatter to 7 memory files</div><div class="card-body">2 SaaS-Conv + 5 Retail files missing YAML frontmatter (name, description, type). Required for tiered loading.</div><div class="card-footer">Impact: 93% &rarr; 100% frontmatter compliance</div></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="rec-p2">
+      <div class="cards">
+        <div class="card priority-p2"><div class="card-label">Handoffs</div><div class="card-title">Archive ~114 historical handoffs</div><div class="card-body">63 completed handoffs + 51 spent prompts. Move to archive/ subdirs.</div><div class="card-footer">Impact: Clean directories</div></div>
+        <div class="card priority-p2"><div class="card-label">Memory</div><div class="card-title">Delete redundant project memories</div><div class="card-body">int-causal-impact (3 files), Client-C-handover (4 files), duplicate feedback in home.</div><div class="card-footer">Impact: 8 files removed</div></div>
+        <div class="card priority-p2"><div class="card-label">Skills</div><div class="card-title">Merge duplicate skill clusters</div><div class="card-body">Writing, slides, git worktree, auto-review, CE work pairs.</div><div class="card-footer">Impact: Fewer trigger conflicts</div></div>
+        <div class="card priority-p2"><div class="card-label">Lessons</div><div class="card-title">Reorder global lessons.md</div><div class="card-body">Move 133b/134b near parent lessons. Fix 3 numbering gaps.</div><div class="card-footer">Impact: Better navigability</div></div>
+        <div class="card priority-p2"><div class="card-label">Memory</div><div class="card-title">Review 40 Retail feedback files</div><div class="card-body">High count &mdash; some may be baked into lessons.md already.</div><div class="card-footer">Impact: ~10-15 file reduction</div></div>
+        <div class="card priority-p2"><div class="card-label">Skills</div><div class="card-title">Build session analytics script</div><div class="card-body">~100 lines Python to parse JSONL &rarr; skill usage report.</div><div class="card-footer">Impact: Ongoing usage visibility</div></div>
+        <div class="card priority-p2"><div class="card-label">Hygiene</div><div class="card-title">Triage 336 behavioral overrides in lessons</div><div class="card-body">111 ALWAYS/NEVER/MUST in global, 74 in SaaS-Conv, 151 in Retail. Identify candidates for axiom promotion (two-incident rule).</div><div class="card-footer">Impact: Surface buried rules to T0</div></div>
+        <div class="card priority-p2"><div class="card-label">Hygiene</div><div class="card-title">Compress 6 SaaS-Conv session checkpoints</div><div class="card-body">6 files meet memory-hygiene thresholds: &gt;30 days old AND &gt;50 lines AND unreferenced from MEMORY.md.</div><div class="card-footer">Impact: Reduce session file bloat</div></div>
+        <div class="card priority-p2"><div class="card-label">Hygiene</div><div class="card-title">Run memory-hygiene for codebase contradictions</div><div class="card-body">Spot-check found 0 contradictions, but a full pass should verify all memory claims against requirements.txt / pyproject.toml.</div><div class="card-footer">Impact: Prevent stale library references</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Cleanup Script ═══ -->
+  <section id="script">
+    <h2>Cleanup Script</h2>
+    <p class="section-sub">Ready-to-run commands for P0 skill cleanup. Review before executing.</p>
+    <div class="code-block"><span class="c"># Remove deprecated skills</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/bsts-placebo-calibration</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/causalpy-wrapper-debug</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/permutation-validation</span>
+
+<span class="c"># Remove adware</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/offer-k-dense-web</span>
+
+<span class="c"># Clean up non-skill entries</span>
+<span class="k">rm</span> <span class="s">-f ~/.claude/skills/.DS_Store</span>
+<span class="k">rm</span> <span class="s">-f ~/.claude/skills/README_TEMPLATE.md</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/review-toolkit-workspace</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/causal-impact-campaign-workspace</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/claude-statusline-workspace</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/client-proposal-slide-workspace</span>
+<span class="k">rm</span> <span class="s">-rf ~/.claude/skills/skill-creator-workspace</span>
+
+<span class="c"># Move cloned repos out of skills/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/autoresearch-claude-code ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/design-for-ai ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/skills-codex ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/skills-codex-claude-review ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/skills-codex-gemini-review ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/ui-ux-pro-max ~/Documents/</span>
+<span class="k">mv</span> <span class="s">~/.claude/skills/shared-references ~/Documents/</span></div>
+  </section>
+
+  <!-- ═══ Grand Summary ═══ -->
+  <section id="grand-summary">
+    <h2>Grand Summary</h2>
+    <p class="section-sub">Full ecosystem inventory &mdash; 996 persistent artifacts across 9 categories.</p>
+    <table>
+      <thead><tr><th>Category</th><th>Total</th><th>Keep</th><th>Archive</th><th>Delete</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Skills</td><td class="mono">394</td><td class="mono">247</td><td class="mono">&mdash;</td><td class="mono">147</td><td class="mono">&mdash;</td></tr>
+        <tr><td>Memory files</td><td class="mono">185</td><td class="mono">148</td><td class="mono">22</td><td class="mono">8</td><td class="mono">7</td></tr>
+        <tr><td>Handoff docs</td><td class="mono">313</td><td class="mono">9</td><td class="mono">114</td><td class="mono">178</td><td class="mono">&mdash;</td></tr>
+        <tr><td>ADRs</td><td class="mono">35</td><td class="mono">23</td><td class="mono">9</td><td class="mono">&mdash;</td><td class="mono">5</td></tr>
+        <tr><td>Plans + Reviews + Findings + Tasks</td><td class="mono">45</td><td class="mono">7</td><td class="mono">36</td><td class="mono">2</td><td class="mono">&mdash;</td></tr>
+        <tr><td>Worktrees</td><td class="mono">12</td><td class="mono">0</td><td class="mono">&mdash;</td><td class="mono">12</td><td class="mono">&mdash;</td></tr>
+        <tr><td>Lessons</td><td class="mono">3</td><td class="mono">3</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">1</td></tr>
+        <tr><td>Automation</td><td class="mono">5</td><td class="mono">3</td><td class="mono">&mdash;</td><td class="mono">1</td><td class="mono">2</td></tr>
+        <tr><td>Data provenance</td><td class="mono">4</td><td class="mono">4</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr class="row-total"><td>Total</td><td class="mono">996</td><td class="mono">444</td><td class="mono">181</td><td class="mono">348</td><td class="mono">15</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.85rem;color:var(--ink-3);margin-top:1.25rem;line-height:1.6;">
+      <strong>996 persistent artifacts.</strong> 444 to keep (45%), 181 to archive (18%), 348 to delete (35%), 15 to fix (2%).
+      Disk recovery: ~156 MB from worktrees + ~2 MB from handoff duplicates.
+    </p>
+  </section>
+
+  <footer>Session N Audit Report &middot; YYYY-MM-DD &middot; Claude Code Ecosystem &middot; Full Coverage (996 artifacts)</footer>
+
+</div></main>
+
+<script>
+// ── Tabs ──
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const group = tab.parentElement;
+    const panels = group.parentElement;
+    group.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    panels.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const target = panels.querySelector('#' + tab.dataset.tab);
+    if (target) {
+      target.classList.add('active');
+      // Animate bars when the tab becomes visible
+      target.querySelectorAll('.bar-fill[data-width]').forEach(el => {
+        el.style.width = '0';
+        requestAnimationFrame(() => { el.style.width = el.dataset.width + '%'; });
+      });
+    }
+  });
+});
+
+// ── Scroll spy ──
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.sidebar a');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector('.sidebar a[href="#' + e.target.id + '"]');
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+sections.forEach(s => obs.observe(s));
+
+// ── Counter animation ──
+function animateNum(el) {
+  const target = parseInt(el.dataset.target);
+  const dur = 1000;
+  const start = performance.now();
+  (function tick(now) {
+    const p = Math.min((now - start) / dur, 1);
+    el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(tick);
+  })(start);
+}
+const heroObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[data-target]').forEach(animateNum);
+      heroObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('.hero, #phase2-intro, #critical').forEach(s => { if (s) heroObs.observe(s); });
+
+// ── Radar chart ──
+(function() {
+  const canvas = document.getElementById('radarChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = 380 * dpr; canvas.height = 380 * dpr;
+  canvas.style.width = '380px'; canvas.style.height = '380px';
+  ctx.scale(dpr, dpr);
+
+  const cx = 190, cy = 190, maxR = 150;
+  const labels = ['Skills', 'Memory', 'Handoffs', 'ADRs', 'Docs', 'Worktrees'];
+  const activeData = [8.9, 47, 2.9, 60, 16, 40];     // % active/healthy (memory-hygiene aligned)
+  const dormantData = [91.1, 53, 97.1, 40, 84, 60]; // % dormant/stale (complement)
+  const n = labels.length;
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+
+  function getPoint(i, val) {
+    const a = startAngle + i * angleStep;
+    const r = (val / 100) * maxR;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function drawRadar() {
+    ctx.clearRect(0, 0, 380, 380);
+
+    // Grid rings
+    for (let ring = 1; ring <= 5; ring++) {
+      const r = (ring / 5) * maxR;
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const a = startAngle + i * angleStep;
+        const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = 'rgba(48,54,61,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Grid ring labels
+    ctx.font = '10px IBM Plex Mono'; ctx.fillStyle = '#484F58'; ctx.textAlign = 'left';
+    for (let ring = 1; ring <= 5; ring++) {
+      const r = (ring / 5) * maxR;
+      ctx.fillText((ring * 20) + '%', cx + 3, cy - r - 2);
+    }
+
+    // Axis lines
+    for (let i = 0; i < n; i++) {
+      const p = getPoint(i, 100);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = 'rgba(48,54,61,0.4)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // Dormant polygon (red, behind)
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const p = getPoint(i % n, 100);
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+    }
+    ctx.fillStyle = 'rgba(248,81,73,0.08)';
+    ctx.strokeStyle = 'rgba(248,81,73,0.3)';
+    ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+
+    // Active polygon (green, on top)
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const p = getPoint(i % n, activeData[i % n]);
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+    }
+    ctx.fillStyle = 'rgba(45,212,168,0.15)';
+    ctx.strokeStyle = 'rgba(45,212,168,0.8)';
+    ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+
+    // Data points on active polygon
+    for (let i = 0; i < n; i++) {
+      const p = getPoint(i, activeData[i]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#2DD4A8'; ctx.fill();
+      ctx.strokeStyle = '#0D1117'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    // Axis labels
+    ctx.font = '600 12px Inter'; ctx.fillStyle = '#8B949E'; ctx.textAlign = 'center';
+    for (let i = 0; i < n; i++) {
+      const p = getPoint(i, 115);
+      const a = startAngle + i * angleStep;
+      if (a > -0.1 && a < 0.1) ctx.textAlign = 'left';
+      else if (Math.abs(a - Math.PI) < 0.3 || Math.abs(a + Math.PI) < 0.3) ctx.textAlign = 'right';
+      else ctx.textAlign = 'center';
+      ctx.fillText(labels[i], p.x, p.y + 4);
+    }
+  }
+
+  drawRadar();
+
+  // Hover interaction
+  const tooltip = document.getElementById('radarTooltip');
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let hit = -1;
+    for (let i = 0; i < n; i++) {
+      const p = getPoint(i, activeData[i]);
+      if (Math.hypot(mx - p.x, my - p.y) < 12) { hit = i; break; }
+    }
+    if (hit >= 0) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (getPoint(hit, activeData[hit]).x + 15) + 'px';
+      tooltip.style.top = (getPoint(hit, activeData[hit]).y - 10) + 'px';
+      tooltip.innerHTML = '<div class="tt-label">' + labels[hit] + '</div>'
+        + '<div class="tt-row"><span class="tt-dot" style="background:#2DD4A8"></span> Active: ' + activeData[hit] + '%</div>'
+        + '<div class="tt-row"><span class="tt-dot" style="background:rgba(248,81,73,0.5)"></span> Dormant: ' + dormantData[hit] + '%</div>';
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
+  });
+  canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+})();
+
+// ── Bar animation on load ──
+setTimeout(() => {
+  document.querySelectorAll('.tab-panel.active .bar-fill[data-width]').forEach(el => {
+    el.style.width = el.dataset.width + '%';
+  });
+}, 500);
+</script>
+</body>
+</html>

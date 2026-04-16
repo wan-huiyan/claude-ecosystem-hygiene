@@ -1,0 +1,19 @@
+{
+  "name": "ecosystem-audit",
+  "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. Produces an interactive HTML report with radar chart.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Huiyan Wan",
+    "url": "https://github.com/wan-huiyan"
+  },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "audit",
+    "hygiene",
+    "ecosystem",
+    "radar-chart"
+  ]
+}
