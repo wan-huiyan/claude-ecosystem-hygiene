@@ -1,0 +1,19 @@
+{
+  "name": "memory-hygiene",
+  "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs. Bundled from wan-huiyan/memory-hygiene.",
+  "version": "3.0.0",
+  "author": {
+    "name": "Huiyan Wan",
+    "url": "https://github.com/wan-huiyan"
+  },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "memory",
+    "hygiene",
+    "lessons",
+    "adr"
+  ]
+}

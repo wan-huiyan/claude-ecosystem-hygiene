@@ -1,0 +1,82 @@
+[
+  {
+    "query": "how many skills do i have installed and which ones am i actually using in practice?",
+    "should_trigger": true
+  },
+  {
+    "query": "my ~/.claude folder feels bloated after 2 months of heavy use with 3 active projects (retail attribution, saas conversion, and a client presentation). can you help me figure out what to clean up across skills, memory, handoffs, and worktrees?",
+    "should_trigger": true
+  },
+  {
+    "query": "i keep getting the same bigquery time travel error (cannot reference table with multiple snapshot read times) and i swear i wrote a lesson about this last week. is my memory system actually working? are my feedback files being read at session start?",
+    "should_trigger": true
+  },
+  {
+    "query": "i installed causal-impact-campaign last week but when i ask 'run a campaign analysis for retail-project between 2024-03 and 2024-06' it never fires automatically - i always have to type /causal-impact-campaign manually. what's broken with my skill setup?",
+    "should_trigger": true
+  },
+  {
+    "query": "every time i ask for slides claude picks a different skill - sometimes pptx, sometimes slides, sometimes pptx-generator - figure out why and tell me which should win",
+    "should_trigger": true
+  },
+  {
+    "query": "do a monthly hygiene check on my claude code ecosystem - especially focus on stale memory files, orphaned handoff prompts in retail_attribution/docs/handoffs/, and any worktrees on merged branches",
+    "should_trigger": true
+  },
+  {
+    "query": "i want to see a health dashboard showing utilization across skills, lessons, feedbacks, memory, handoffs, ADRs, docs, and worktrees",
+    "should_trigger": true
+  },
+  {
+    "query": "which of my 394 installed skills are niche-domain ones that i can safely uninstall? i work in data science / causal inference, not wet lab or quantum",
+    "should_trigger": true
+  },
+  {
+    "query": "check if i have orphaned handoff prompts (session_N_prompt.md files that were never used) and stale worktrees across saas-conv, retail-project, and client-deck projects - give me a cleanup script",
+    "should_trigger": true
+  },
+  {
+    "query": "my ecosystem audit from session 55 is stale after 30 days - can you regenerate the report with fresh data from JSONL session logs and show me what changed?",
+    "should_trigger": true
+  },
+  {
+    "query": "audit my python code in webapp/app.py for unused imports and dead functions",
+    "should_trigger": false
+  },
+  {
+    "query": "review PR #47 on retail_attribution and check the code quality of the data-masking fix",
+    "should_trigger": false
+  },
+  {
+    "query": "my bigquery query on analytics-warehouse.ml_features.signups is slow (takes 4 min to scan 2TB), can you optimize the partition filters?",
+    "should_trigger": false
+  },
+  {
+    "query": "check if my dockerfile for the webapp deployment follows best practices - multi-stage build, pinned versions, non-root user etc",
+    "should_trigger": false
+  },
+  {
+    "query": "audit my dbt project for stale models - specifically the ones in the sessionization layer that haven't been updated since march",
+    "should_trigger": false
+  },
+  {
+    "query": "run schliff:doctor on my installed skills and give me the quality scores",
+    "should_trigger": false
+  },
+  {
+    "query": "clean up the 15 old feature branches in my retail_attribution repo that have been merged to main - use git branch -d",
+    "should_trigger": false
+  },
+  {
+    "query": "help me audit my GCP cloud run costs this month - i think the batch experiment job is burning more than expected",
+    "should_trigger": false
+  },
+  {
+    "query": "review my k8s-manifests/deployment.yaml and flag any security issues or missing resource limits",
+    "should_trigger": false
+  },
+  {
+    "query": "write a new skill for automatically generating causal inference pre-period specifications based on intervention date",
+    "should_trigger": false
+  }
+]
