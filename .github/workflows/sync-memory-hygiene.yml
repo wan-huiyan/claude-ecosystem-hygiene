@@ -1,0 +1,125 @@
+name: Sync memory-hygiene from upstream
+
+# Keeps plugins/memory-hygiene/ in sync with the canonical
+# wan-huiyan/memory-hygiene repo.
+#
+# Triggers:
+#   - schedule: Monday 09:00 UTC (weekly check)
+#   - workflow_dispatch: manual trigger from GitHub UI or gh CLI
+#   - repository_dispatch: fired by memory-hygiene's own push workflow (near-real-time sync)
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [memory-hygiene-updated]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out bundle repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clone upstream memory-hygiene
+        run: |
+          git clone --depth 1 https://github.com/wan-huiyan/memory-hygiene.git /tmp/upstream-mh
+          cd /tmp/upstream-mh
+          echo "UPSTREAM_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "UPSTREAM_VERSION=$(grep -E '^# Memory Hygiene v' README.md | head -1 | sed -E 's/.*v([0-9.]+).*/\1/' || grep -E '^## v' README.md | head -1 | sed -E 's/## v([0-9.]+).*/\1/' || echo 'unknown')" >> $GITHUB_ENV
+
+      - name: Sync files into plugins/memory-hygiene/
+        id: sync
+        run: |
+          set -e
+          BUNDLE_DIR=plugins/memory-hygiene
+          UPSTREAM=/tmp/upstream-mh
+
+          # Preserve the bundle-specific plugin.json — it has the marketplace author URL etc.
+          # and is NOT something we want to overwrite from upstream.
+          cp "$BUNDLE_DIR/.claude-plugin/plugin.json" /tmp/keep-plugin.json
+
+          # Rsync all user-facing files, excluding things that shouldn't propagate to the bundle
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude-plugin' \
+            --exclude='node_modules' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.DS_Store' \
+            "$UPSTREAM/" "$BUNDLE_DIR/"
+
+          # Restore the bundle's plugin.json (author, repo URL, keywords)
+          mkdir -p "$BUNDLE_DIR/.claude-plugin"
+          cp /tmp/keep-plugin.json "$BUNDLE_DIR/.claude-plugin/plugin.json"
+
+          # Extract the upstream version from SKILL.md frontmatter and propagate it
+          # into the bundle's plugin.json + marketplace.json so consumers see matching versions.
+          UPSTREAM_SKILL_VERSION=$(python3 -c "
+          import re, sys
+          with open('$BUNDLE_DIR/SKILL.md') as f:
+              content = f.read()
+          m = re.search(r'version:\s*([0-9.]+)', content) or re.search(r'v([0-9.]+)', content)
+          print(m.group(1) if m else '')
+          ")
+
+          if [ -n "$UPSTREAM_SKILL_VERSION" ]; then
+            echo "upstream_version=$UPSTREAM_SKILL_VERSION" >> $GITHUB_OUTPUT
+
+            # Update plugin.json version
+            python3 -c "
+          import json
+          p = '$BUNDLE_DIR/.claude-plugin/plugin.json'
+          d = json.load(open(p))
+          d['version'] = '$UPSTREAM_SKILL_VERSION'
+          open(p, 'w').write(json.dumps(d, indent=2) + '\n')
+          "
+
+            # Update marketplace.json entry for memory-hygiene
+            python3 -c "
+          import json
+          p = '.claude-plugin/marketplace.json'
+          d = json.load(open(p))
+          for plugin in d.get('plugins', []):
+              if plugin.get('name') == 'memory-hygiene':
+                  plugin['version'] = '$UPSTREAM_SKILL_VERSION'
+          open(p, 'w').write(json.dumps(d, indent=2) + '\n')
+          "
+          fi
+
+          # Check if anything changed
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push (if changes)
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/memory-hygiene .claude-plugin/marketplace.json
+          UPSTREAM_SHORT=$(echo "${{ env.UPSTREAM_SHA }}" | cut -c1-7)
+          git commit -m "chore: sync memory-hygiene from upstream @ ${UPSTREAM_SHORT}" \
+            -m "Upstream: https://github.com/wan-huiyan/memory-hygiene/commit/${{ env.UPSTREAM_SHA }}" \
+            -m "Version: ${{ steps.sync.outputs.upstream_version }}" \
+            -m "Auto-synced by .github/workflows/sync-memory-hygiene.yml"
+          git push
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.sync.outputs.changed }}" = "true" ]; then
+            echo "✅ Synced memory-hygiene from upstream @ ${{ env.UPSTREAM_SHA }}" >> $GITHUB_STEP_SUMMARY
+            echo "Version: ${{ steps.sync.outputs.upstream_version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✓ Already in sync with upstream @ ${{ env.UPSTREAM_SHA }}" >> $GITHUB_STEP_SUMMARY
+          fi
