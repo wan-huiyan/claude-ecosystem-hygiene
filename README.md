@@ -1,6 +1,6 @@
 # Claude Code Ecosystem Hygiene
 
-Three complementary skills for auditing and maintaining Claude Code ecosystem health — skills, memory, handoffs, ADRs, worktrees, and automation — with a diagnostic skill for the skill-creator workflow itself.
+Two complementary skills for auditing and maintaining Claude Code ecosystem health — skills usage, memory, handoffs, ADRs, worktrees, and automation.
 
 [![license](https://img.shields.io/github/license/wan-huiyan/claude-ecosystem-hygiene)](LICENSE)
 [![last commit](https://img.shields.io/github/last-commit/wan-huiyan/claude-ecosystem-hygiene)](https://github.com/wan-huiyan/claude-ecosystem-hygiene/commits)
@@ -14,7 +14,10 @@ Three complementary skills for auditing and maintaining Claude Code ecosystem he
 |--------|--------------|
 | [`ecosystem-audit`](plugins/ecosystem-audit/) | Full-coverage audit across 9 artifact categories (skills, memory, handoffs, ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real skill invocation data. Produces interactive HTML report with radar chart and prioritized P0/P1/P2 cleanup actions. |
 | [`memory-hygiene`](plugins/memory-hygiene/) | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
-| [`skill-trigger-eval-subprocess-blindness`](plugins/skill-trigger-eval-subprocess-blindness/) | Diagnostic guide for the skill-creator optimization loop. Explains why introspection/audit skills systematically report 0% recall in `run_eval.py` even with perfect descriptions — the subprocess has no project context and Claude answers directly via shell instead of consulting the skill. Saves you from rewriting a description that was never broken. |
+
+> **Moved:** `skill-trigger-eval-subprocess-blindness` lived here in v1.0.0 but has been
+> relocated to [`wan-huiyan/claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring)
+> where it sits alongside other skill-authoring tools. Update your install if you had it.
 
 ## Quick Start
 
@@ -36,13 +39,12 @@ you: *opens docs/handoffs/ecosystem_audit_report.html*
 
 ## Installation
 
-### Install all three (recommended)
+### Install both (recommended)
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
 claude plugin install ecosystem-audit@wan-huiyan-ecosystem-hygiene
 claude plugin install memory-hygiene@wan-huiyan-ecosystem-hygiene
-claude plugin install skill-trigger-eval-subprocess-blindness@wan-huiyan-ecosystem-hygiene
 ```
 
 ### Install individually via git
@@ -51,7 +53,6 @@ claude plugin install skill-trigger-eval-subprocess-blindness@wan-huiyan-ecosyst
 git clone https://github.com/wan-huiyan/claude-ecosystem-hygiene.git /tmp/ceh
 cp -r /tmp/ceh/plugins/ecosystem-audit ~/.claude/skills/
 cp -r /tmp/ceh/plugins/memory-hygiene ~/.claude/skills/
-cp -r /tmp/ceh/plugins/skill-trigger-eval-subprocess-blindness ~/.claude/skills/
 ```
 
 > **Note:** `memory-hygiene` is also available as a standalone repo at
@@ -75,18 +76,13 @@ cp -r /tmp/ceh/plugins/skill-trigger-eval-subprocess-blindness ~/.claude/skills/
 │    ├─ lessons dedup + tier placement                        │
 │    ├─ ADR integrity (MADR 4.0 compliance)                   │
 │    └─ codebase contradiction detection                      │
-├─────────────────────────────────────────────────────────────┤
-│  skill-trigger-eval-        Scope: skill developer tooling  │
-│    subprocess-blindness                                     │
-│    ├─ diagnoses 0% recall pattern                           │
-│    ├─ two-test verification protocol                        │
-│    └─ tells you when to stop rewriting the description      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 Run `ecosystem-audit` to see the big picture. When it flags memory issues, drop into
-`memory-hygiene` for concrete fixes. When building your own skills, keep
-`skill-trigger-eval-subprocess-blindness` nearby to avoid a 30-minute dead end.
+`memory-hygiene` for concrete fixes. For skill-authoring tooling (including the
+subprocess-blindness diagnostic), see
+[`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring).
 
 ## What You Get
 
@@ -108,7 +104,6 @@ When you ask Claude to audit your ecosystem, you get:
 | "Is my memory bloated?" | Open MEMORY.md, eyeball it | `wc -l` against thresholds: bloated >200, target ~40 |
 | "Are my handoffs stale?" | Manually scan `docs/handoffs/` | Classify as Current/Historical/Orphaned with counts per project |
 | "Are my worktrees healthy?" | `git worktree list` — see paths, not staleness | Lifecycle score (EXPECTED / ACCEPTABLE / NEEDS_CLEANUP / ABANDONED) |
-| "Why does my skill never fire?" | Rewrite description 5x, still fails eval | Diagnose subprocess blindness, verify with 2-test protocol |
 
 ## Decision Criteria
 
@@ -151,12 +146,12 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 - [x] **Published thresholds are cited.** Cowan, Liu et al., and platform limits link to sources. Heuristics are labeled as such.
 - [x] **HTML report is self-contained.** No external CDN dependencies, works offline after initial font load.
 - [x] **JSONL parsing tested on 291 real sessions** (~35 skills, ~226 invocations, all projects).
-- [x] **Subprocess blindness diagnosis verified** on real skill-creator `run_eval.py` output.
 
 </details>
 
 ## Version History
 
+- **v1.1.0** (2026-04-17) — Moved `skill-trigger-eval-subprocess-blindness` to [`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring); it was out of scope for this marketplace.
 - **v1.0.0** (2026-04-16) — Initial bundle release. Contains ecosystem-audit v1.0.0, memory-hygiene v3.0.0, skill-trigger-eval-subprocess-blindness v1.0.0.
 
 ## License
