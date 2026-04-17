@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "wan-huiyan-ecosystem-hygiene",
-  "description": "Three complementary skills for auditing and maintaining Claude Code ecosystem health: skills, memory, handoffs, ADRs, worktrees, and automation.",
+  "description": "Two complementary skills for auditing and maintaining Claude Code ecosystem health: skills usage, memory, handoffs, ADRs, worktrees, and automation.",
   "owner": {
     "name": "Huiyan Wan",
     "url": "https://github.com/wan-huiyan"
@@ -18,12 +18,6 @@
       "source": "./plugins/memory-hygiene",
       "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs. Bundled from wan-huiyan/memory-hygiene.",
       "version": "3.0.0"
-    },
-    {
-      "name": "skill-trigger-eval-subprocess-blindness",
-      "source": "./plugins/skill-trigger-eval-subprocess-blindness",
-      "description": "Diagnose 0% recall from skill-creator's trigger evaluation loop. Explains why introspection/audit skills appear to never fire in `run_eval.py`/`run_loop.py` even with perfect descriptions, and how to distinguish subprocess blindness from a genuinely broken description.",
-      "version": "1.0.0"
     }
   ]
 }
