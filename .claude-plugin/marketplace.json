@@ -11,7 +11,7 @@
       "name": "ecosystem-audit",
       "source": "./plugins/ecosystem-audit",
       "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. Produces an interactive HTML report with radar chart.",
-      "version": "1.0.0"
+      "version": "1.1.0"
     },
     {
       "name": "memory-hygiene",

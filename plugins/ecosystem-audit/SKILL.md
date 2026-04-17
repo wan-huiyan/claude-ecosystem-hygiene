@@ -93,30 +93,39 @@ Parse JSONL session logs to determine which skills are actually invoked.
 
 ### 1B. Memory & Lessons Scan
 
-Check all persistent memory artifacts across all projects.
+**Delegation contract with memory-hygiene (single source of truth).**
 
-**Scan targets:**
-- `~/.claude/projects/*/memory/` — all project memory directories
-- `~/.claude/axioms.md` — behavioral overrides
-- `~/.claude/lessons.md` — global lessons archive
-- `~/.claude/CLAUDE.md` — retrieval strategy
+memory-hygiene (v3.0+) is the authoritative spec for the Memory tier. To prevent drift, the Memory subagent does NOT re-implement memory-hygiene's detection logic. Instead:
 
-**Apply memory-hygiene thresholds:**
+1. **Invoke `memory-hygiene` Phase 1 (Discover) only** — do not execute Phase 4 fixes.
+2. **Consume its structured audit report** (the headings under `## Memory Hygiene Audit`) as the input to ecosystem-audit's Memory score.
+3. **Version-pin check:** read memory-hygiene's SKILL.md frontmatter. If the major version differs from what this skill was calibrated against (currently v3.0), fail loudly and ask the user to re-sync ecosystem-audit before scoring.
 
-| Metric | Threshold | Source |
-|--------|-----------|--------|
-| MEMORY.md line count | >200 lines = bloated, target ~40 | memory-hygiene |
-| Axioms count | >12 items = over Cowan cap | memory-hygiene (Cowan 2001) |
-| Session compression | >30 days + >50 lines + unreferenced | memory-hygiene |
-| Archive split | sessions_archive > 200 lines | memory-hygiene |
-| Frontmatter | All topic files need name/description/type | memory-hygiene |
-| CLAUDE.md | Must say "grep" not "read" for lessons | memory-hygiene |
+If for any reason memory-hygiene cannot run (missing, errored, version mismatch), render the Memory axis as `N/A` in the radar chart (see Phase 3) and list blockers. Never fabricate a score.
 
-**Per-file checks:**
+**Scan targets covered by memory-hygiene (full tier map T0→T3):**
+
+| Tier | Path | Key checks |
+|------|------|------------|
+| T0 | `~/.claude/axioms.md` | Count ≤12 (Cowan cap); classify each as Universal / Role / Phase; flag Phase items for migration to `~/.claude/templates/phase_*.md` |
+| T0 | `~/.claude/CLAUDE.md` | Session-start checklist has all 4 items: load axioms, read MEMORY.md, grep archives, grep before "cannot" claims |
+| T1 | `~/.claude/projects/*/memory/MEMORY.md` | Line count ≤200 (hard limit 25KB); entries are one-line pointers, no inline content |
+| T1.5 | `~/.claude/templates/phase_*.md` | Standard templates exist (onboarding, data sourcing, analysis, deliverables, code review) |
+| T1.5 | `<project>/.claude/rules/phase-*.md` | `paths:` frontmatter globs resolve to real files (no dead globs); content consistent with the global template it was copied from |
+| T2 | `~/.claude/projects/*/memory/*.md` | Frontmatter has name/description/type; `type` ∈ {user, feedback, project, reference}; indexed in MEMORY.md (no orphans) |
+| T3 | `~/.claude/lessons.md`, `sessions_archive.md`, handoffs | Unreferenced sessions >30 days old AND >50 lines → compression candidate; archive >200 lines → split candidate |
+
+**Staleness signals (memory-hygiene §1d — all four, not just dates):**
+- Broken references (grep codebase for identifier; not found = stale)
+- Relative dates ("last week", "recently") that should be absolute
+- Codebase contradictions (memory says lib X; `package.json` says otherwise)
+- Contradicted lessons (global vs project rules conflict)
+
+**Agency-aware staleness:** read `user_role.md` before thresholding. Agency / multi-client users measure dormancy in calendar time across portfolio; single-long-project users measure in session count within the project.
+
+**Per-file cross-cutting checks (detection only; resolution belongs to memory-hygiene):**
 - Orphan detection (file exists but not in MEMORY.md index)
-- Staleness (references completed projects, contains relative dates)
-- Cross-project duplicates (same feedback file in multiple projects)
-- Frontmatter validation (name, description, type fields)
+- Cross-project duplicates (same feedback file in multiple projects) — report clusters; memory-hygiene Phase 4 owns keep/move/merge decisions
 
 ### 1C. Handoffs & Session Docs Scan
 
@@ -157,12 +166,15 @@ because "healthy" means different things for different artifact types.
 **Skills**: `active_count / total_installed * 100`
 Simple utilization rate. Active = invoked in the log window.
 
-**Memory**: Weighted composite of sub-checks:
-- MEMORY.md line count vs threshold (weight: 30%)
-- Frontmatter compliance rate (weight: 20%)
-- Axioms count vs Cowan cap (weight: 15%)
-- Staleness rate of topic files (weight: 20%)
+**Memory**: Weighted composite of sub-checks, computed from memory-hygiene's Discover report:
+- MEMORY.md line count vs threshold (weight: 25%)
+- Frontmatter compliance rate, incl. `type` enum validity (weight: 15%)
+- Axiom health — count ≤12 AND zero Phase items in axioms.md (weight: 15%)
+- Phase-template hygiene — templates exist, no dead `paths:` globs (weight: 10%)
+- Staleness rate of topic files (all 4 signals, agency-aware) (weight: 20%)
 - Session compression backlog (weight: 15%)
+
+If any sub-check is un-computable (missing input, memory-hygiene unavailable), set the Memory axis to `N/A` rather than averaging over a partial signal.
 
 **Handoffs**: `current_count / total_count * 100`
 Only current handoffs are "healthy" — historical ones should be archived.
@@ -216,6 +228,8 @@ Each axis shows the health percentage from Phase 2 scoring.
 Two overlaid polygons:
 - **Teal (active/healthy)**: the health score per category
 - **Red (dormant/stale)**: the complement (100% - health)
+
+**Never fabricate a score.** If any sub-check for an axis could not be computed (e.g., memory-hygiene unavailable, `user_role.md` missing, version mismatch), render that axis as `N/A` with a hatched pattern and list blockers in the report's "Coverage" section. A partial average is worse than a missing reading.
 
 ## Complementary Skills
 
