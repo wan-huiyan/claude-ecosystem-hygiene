@@ -1,0 +1,117 @@
+name: Sync test-effectiveness-auditor from upstream
+
+# Keeps plugins/test-effectiveness-auditor/ in sync with the canonical
+# wan-huiyan/test-effectiveness-auditor repo. Mirrors sync-memory-hygiene.yml.
+#
+# Triggers:
+#   - schedule: Monday 09:05 UTC (weekly check, offset 5min from memory-hygiene
+#                                  to avoid concurrent commits to main)
+#   - workflow_dispatch: manual trigger from GitHub UI or gh CLI
+#   - repository_dispatch: fired by upstream's notify-bundle workflow
+#                          (near-real-time sync)
+
+on:
+  schedule:
+    - cron: '5 9 * * 1'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [test-effectiveness-auditor-updated]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out bundle repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone upstream test-effectiveness-auditor
+        run: |
+          git clone --depth 1 https://github.com/wan-huiyan/test-effectiveness-auditor.git /tmp/upstream-tea
+          cd /tmp/upstream-tea
+          echo "UPSTREAM_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Sync plugin contents
+        id: sync
+        run: |
+          set -e
+          BUNDLE_DIR=plugins/test-effectiveness-auditor
+          UPSTREAM_PLUGIN=/tmp/upstream-tea/plugins/test-effectiveness-auditor
+
+          if [ ! -d "$UPSTREAM_PLUGIN" ]; then
+            echo "::error::Upstream plugin dir not found at $UPSTREAM_PLUGIN"
+            exit 1
+          fi
+
+          # Rsync all plugin files EXCEPT the bundle-specific .claude-plugin/plugin.json,
+          # which keeps the bundle's author/repo/keywords metadata.
+          rsync -a --delete \
+            --exclude='.claude-plugin/plugin.json' \
+            "$UPSTREAM_PLUGIN/" "$BUNDLE_DIR/"
+
+          # Extract upstream version from plugin.json (canonical source for this repo).
+          UPSTREAM_VERSION=$(python3 -c 'import json; print(json.load(open("/tmp/upstream-tea/plugins/test-effectiveness-auditor/.claude-plugin/plugin.json"))["version"])')
+          if [ -z "$UPSTREAM_VERSION" ]; then
+            echo "::warning::Could not extract version from upstream plugin.json — skipping version sync"
+          else
+            echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+            case "$UPSTREAM_VERSION" in
+              *.*.*) SEMVER=$UPSTREAM_VERSION ;;
+              *.*) SEMVER="${UPSTREAM_VERSION}.0" ;;
+              *) SEMVER="${UPSTREAM_VERSION}.0.0" ;;
+            esac
+            echo "semver=$SEMVER" >> $GITHUB_OUTPUT
+
+            python3 - <<PYEOF
+          import json
+          # Update plugin.json
+          p = "$BUNDLE_DIR/.claude-plugin/plugin.json"
+          d = json.load(open(p))
+          d["version"] = "$SEMVER"
+          open(p, "w").write(json.dumps(d, indent=2) + "\n")
+          print(f"plugin.json -> {d['version']}")
+
+          # Update marketplace.json
+          m = ".claude-plugin/marketplace.json"
+          md = json.load(open(m))
+          for plugin in md.get("plugins", []):
+              if plugin.get("name") == "test-effectiveness-auditor":
+                  plugin["version"] = "$SEMVER"
+                  print(f"marketplace.json -> test-effectiveness-auditor {plugin['version']}")
+          open(m, "w").write(json.dumps(md, indent=2) + "\n")
+          PYEOF
+          fi
+
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected:"
+            git diff --stat
+          fi
+
+      - name: Commit and push (if changes)
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/test-effectiveness-auditor .claude-plugin/marketplace.json
+          UPSTREAM_SHORT=$(echo "${UPSTREAM_SHA}" | cut -c1-7)
+          git commit -m "chore: sync test-effectiveness-auditor from upstream @ ${UPSTREAM_SHORT}" \
+            -m "Upstream: https://github.com/wan-huiyan/test-effectiveness-auditor/commit/${UPSTREAM_SHA}" \
+            -m "Version: ${{ steps.sync.outputs.semver }}" \
+            -m "Auto-synced by .github/workflows/sync-test-effectiveness-auditor.yml"
+          git push
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.sync.outputs.changed }}" = "true" ]; then
+            echo "Synced test-effectiveness-auditor from upstream @ ${UPSTREAM_SHA}" >> $GITHUB_STEP_SUMMARY
+            echo "Version: ${{ steps.sync.outputs.semver }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Already in sync with upstream @ ${UPSTREAM_SHA}" >> $GITHUB_STEP_SUMMARY
+          fi
