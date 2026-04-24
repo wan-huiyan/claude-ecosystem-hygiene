@@ -1,0 +1,20 @@
+{
+  "name": "doc-freshness-reverse-lint",
+  "description": "Detect stale normative guidance in project docs/ after the user adds a new \"don't X / avoid Y\" rule to ~/.claude/lessons.md, ~/.claude/axioms.md, or a per-project feedback_*.md entry. Event-driven PostToolUse hook + weekly cron audit. Lists file:line candidate stale claims — never auto-edits. Conservative guardrails: explicit negation only, multi-token phrase, one phrase per rule, silent on zero hits.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Huiyan Wan",
+    "url": "https://github.com/wan-huiyan"
+  },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "docs",
+    "freshness",
+    "hygiene",
+    "lessons",
+    "hooks"
+  ]
+}
