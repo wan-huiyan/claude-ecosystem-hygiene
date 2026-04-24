@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "wan-huiyan-ecosystem-hygiene",
-  "description": "Three complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. Audit \u2192 measure \u2192 clean: identify HOT vs DORMANT artifacts, measure whether the HOT ones actually improve outcomes, prune what doesn't pull its weight.",
+  "description": "Four complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. Audit \u2192 measure \u2192 clean \u2192 stay consistent: identify HOT vs DORMANT artifacts, measure whether the HOT ones actually improve outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them.",
   "owner": {
     "name": "Huiyan Wan",
     "url": "https://github.com/wan-huiyan"
@@ -24,6 +24,12 @@
       "source": "./plugins/memory-hygiene",
       "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs. Bundled from wan-huiyan/memory-hygiene.",
       "version": "3.0.0"
+    },
+    {
+      "name": "doc-freshness-reverse-lint",
+      "source": "./plugins/doc-freshness-reverse-lint",
+      "description": "Detect stale normative guidance in project docs/ after a correction lands in lessons.md / axioms.md / feedback_*.md. Event-driven PostToolUse hook + weekly cron audit. Lists file:line candidate stale claims \u2014 never auto-edits. Conservative guardrails prevent false positives on qualified or rephrased content.",
+      "version": "1.0.0"
     }
   ]
 }
