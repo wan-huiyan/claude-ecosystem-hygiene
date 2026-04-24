@@ -1,6 +1,6 @@
 # Claude Code Ecosystem Hygiene
 
-Three complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. **Audit → measure → clean:** identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve outcomes, prune what doesn't pull its weight.
+Four complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. **Audit → measure → clean → stay consistent:** identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them.
 
 [![license](https://img.shields.io/github/license/wan-huiyan/claude-ecosystem-hygiene)](LICENSE)
 [![last commit](https://img.shields.io/github/last-commit/wan-huiyan/claude-ecosystem-hygiene)](https://github.com/wan-huiyan/claude-ecosystem-hygiene/commits)
@@ -31,6 +31,7 @@ Reference counts are a starting point, not a verdict. `ecosystem-audit` catches 
 | [`ecosystem-audit`](plugins/ecosystem-audit/) | **Audit** | Full-coverage audit across 9 artifact categories (skills, memory, handoffs, ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real skill invocation data. Produces interactive HTML report with radar chart and prioritized P0/P1/P2 cleanup actions. |
 | [`claude-code-ab-harness`](plugins/claude-code-ab-harness/) | **Measure** | Counterfactual A/B + layered-ablation harness. Runs each task twice (setup-ON vs setup-OFF) or strips one layer at a time from a full baseline, then reports turns, tool calls, cost, and pitfall-keyword hits. **Heavyweight: $10–$80, 30min–3hrs.** Pair with the audit to turn reference-count signals into actual quality measurements. |
 | [`memory-hygiene`](plugins/memory-hygiene/) | **Clean** | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
+| [`doc-freshness-reverse-lint`](plugins/doc-freshness-reverse-lint/) | **Stay consistent** | Event-driven PostToolUse hook + weekly cron that catches project `docs/` contradicting the lessons that supersede them. When you add "don't sort by p-value" to `lessons.md`, the hook greps `docs/research/**` for literal matches and surfaces them as candidate stale claims — file:line only, never auto-edits. Conservative guardrails (explicit negation, multi-token phrase, one phrase per rule, silent on zero hits) prevent false positives on qualified content. |
 
 > **Moved:** `skill-trigger-eval-subprocess-blindness` lived here in v1.0.0 but has been
 > relocated to [`wan-huiyan/claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring)
