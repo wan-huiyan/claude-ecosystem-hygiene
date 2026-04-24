@@ -22,7 +22,7 @@ This skill watches for new "don't X / avoid Y" entries in your memory files, gre
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
-claude plugin install doc-freshness-reverse-lint@wan-huiyan-ecosystem-hygiene
+claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
 ```
 
 ### Hook wiring (required for event-driven mode)
@@ -75,7 +75,7 @@ The skill ships with a validation case under `evals/`:
 
 - **[ecosystem-audit](../ecosystem-audit/)** — full ecosystem health scan.
 - **[memory-hygiene](../memory-hygiene/)** — prune the memory files that this skill watches.
-- **[claude-code-ab-harness](../claude-code-ab-harness/)** — measure whether artifacts improve outcomes.
+- **[ab-harness](../ab-harness/)** — measure whether artifacts improve outcomes.
 
 ## License
 
