@@ -14,10 +14,10 @@
       "version": "1.1.0"
     },
     {
-      "name": "claude-code-ab-harness",
-      "source": "./plugins/claude-code-ab-harness",
+      "name": "ab-harness",
+      "source": "./plugins/ab-harness",
       "description": "Counterfactual A/B + layered-ablation harness for Claude Code setup. Measures whether your ~/.claude/ stack actually improves task outcomes. Heavyweight ($10\u2013$80 per run, 30min\u20133hrs). Pairs with ecosystem-audit (identify HOT artifacts) and memory-hygiene (prune what the harness shows adds no value).",
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     {
       "name": "memory-hygiene",

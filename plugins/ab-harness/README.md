@@ -1,4 +1,4 @@
-# claude-code-ab-harness
+# ab-harness
 
 A counterfactual A/B + layered-ablation harness for the `~/.claude` setup. Answers
 the question **"does my Claude Code setup actually help, or am I just collecting
@@ -27,7 +27,7 @@ output*. Those are different questions.
 ## Relationship to the other plugins in this marketplace
 
 ```
-ecosystem-audit          →   claude-code-ab-harness    →   memory-hygiene
+ecosystem-audit          →   ab-harness    →   memory-hygiene
 "what's HOT vs              "do the HOT artifacts         "prune what the
  DORMANT?"                   improve outcomes?"            harness showed
                                                            adds no value"
@@ -100,14 +100,14 @@ each example file.
 ```bash
 # Install the whole marketplace
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
-claude plugin install claude-code-ab-harness@claude-ecosystem-hygiene
+claude plugin install ab-harness@claude-ecosystem-hygiene
 ```
 
 Or copy directly:
 
 ```bash
 git clone https://github.com/wan-huiyan/claude-ecosystem-hygiene.git /tmp/ceh
-cp -r /tmp/ceh/plugins/claude-code-ab-harness ~/.claude/skills/
+cp -r /tmp/ceh/plugins/ab-harness ~/.claude/skills/
 ```
 
 ## Source of truth
