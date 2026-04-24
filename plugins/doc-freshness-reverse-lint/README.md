@@ -22,7 +22,7 @@ This skill watches for new "don't X / avoid Y" entries in your memory files, gre
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
-claude plugin install doc-freshness-reverse-lint@wan-huiyan-ecosystem-hygiene
+claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
 ```
 
 ### Hook wiring (required for event-driven mode)

@@ -3,7 +3,7 @@
   "description": "Counterfactual A/B + layered-ablation harness for Claude Code setup. Measures whether your ~/.claude/ stack (skills, lessons, axioms, memory) plus in-repo discipline (docs/runbooks, decisions, findings) actually helps on real tasks. Binary A/B (setup-ON vs setup-OFF) and layered ablation (strip one layer at a time, rank by impact). Heavyweight: $10\u2013$80 per run, 30min\u20133hrs wall time \u2014 this is a measurement experiment, not a lint. Pairs with ecosystem-audit (identify HOT artifacts) and memory-hygiene (prune DORMANT ones).",
   "version": "1.1.0",
   "author": {
-    "name": "Huiyan Wan",
+    "name": "wan-huiyan",
     "url": "https://github.com/wan-huiyan"
   },
   "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",

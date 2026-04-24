@@ -75,10 +75,10 @@ claude: *triggers memory-hygiene*
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
-claude plugin install ecosystem-audit@wan-huiyan-ecosystem-hygiene
-claude plugin install claude-code-ab-harness@wan-huiyan-ecosystem-hygiene
-claude plugin install memory-hygiene@wan-huiyan-ecosystem-hygiene
-claude plugin install doc-freshness-reverse-lint@wan-huiyan-ecosystem-hygiene
+claude plugin install ecosystem-audit@claude-ecosystem-hygiene
+claude plugin install claude-code-ab-harness@claude-ecosystem-hygiene
+claude plugin install memory-hygiene@claude-ecosystem-hygiene
+claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
 ```
 
 ### Install individually via git

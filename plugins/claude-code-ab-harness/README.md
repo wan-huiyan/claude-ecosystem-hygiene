@@ -100,7 +100,7 @@ each example file.
 ```bash
 # Install the whole marketplace
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
-claude plugin install claude-code-ab-harness@wan-huiyan-ecosystem-hygiene
+claude plugin install claude-code-ab-harness@claude-ecosystem-hygiene
 ```
 
 Or copy directly:

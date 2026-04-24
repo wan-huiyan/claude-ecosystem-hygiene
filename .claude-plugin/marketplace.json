@@ -1,9 +1,9 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "wan-huiyan-ecosystem-hygiene",
+  "name": "claude-ecosystem-hygiene",
   "description": "Four complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. Audit \u2192 measure \u2192 clean \u2192 stay consistent: identify HOT vs DORMANT artifacts, measure whether the HOT ones actually improve outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them.",
   "owner": {
-    "name": "Huiyan Wan",
+    "name": "wan-huiyan",
     "url": "https://github.com/wan-huiyan"
   },
   "plugins": [
@@ -22,7 +22,7 @@
     {
       "name": "memory-hygiene",
       "source": "./plugins/memory-hygiene",
-      "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs. Bundled from wan-huiyan/memory-hygiene.",
+      "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs.",
       "version": "3.0.0"
     },
     {

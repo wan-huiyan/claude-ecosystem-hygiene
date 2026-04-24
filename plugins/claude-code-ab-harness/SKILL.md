@@ -11,7 +11,7 @@ description: |
   and doesn't isolate, fair-comparison knobs (model pinning, permission mode, stdin),
   how to mine num_turns/tool_calls/pitfall-hits from the resulting JSONL transcripts,
   and the honest caveats any n=3 harness report must declare.
-author: Huiyan Wan (Claude-assisted, from 2026-04-21 binary A/B session; layered-ablation extensions 2026-04-23)
+author: wan-huiyan (Claude-assisted, from 2026-04-21 binary A/B session; layered-ablation extensions 2026-04-23)
 version: 1.1.0
 date: 2026-04-23
 ---
