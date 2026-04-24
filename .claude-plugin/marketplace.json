@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "wan-huiyan-ecosystem-hygiene",
-  "description": "Two complementary skills for auditing and maintaining Claude Code ecosystem health: skills usage, memory, handoffs, ADRs, worktrees, and automation.",
+  "description": "Three complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. Audit \u2192 measure \u2192 clean: identify HOT vs DORMANT artifacts, measure whether the HOT ones actually improve outcomes, prune what doesn't pull its weight.",
   "owner": {
     "name": "Huiyan Wan",
     "url": "https://github.com/wan-huiyan"
@@ -11,6 +11,12 @@
       "name": "ecosystem-audit",
       "source": "./plugins/ecosystem-audit",
       "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. Produces an interactive HTML report with radar chart.",
+      "version": "1.1.0"
+    },
+    {
+      "name": "claude-code-ab-harness",
+      "source": "./plugins/claude-code-ab-harness",
+      "description": "Counterfactual A/B + layered-ablation harness for Claude Code setup. Measures whether your ~/.claude/ stack actually improves task outcomes. Heavyweight ($10\u2013$80 per run, 30min\u20133hrs). Pairs with ecosystem-audit (identify HOT artifacts) and memory-hygiene (prune what the harness shows adds no value).",
       "version": "1.1.0"
     },
     {

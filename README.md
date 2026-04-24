@@ -1,6 +1,6 @@
 # Claude Code Ecosystem Hygiene
 
-Two complementary skills for auditing and maintaining Claude Code ecosystem health — skills usage, memory, handoffs, ADRs, worktrees, and automation.
+Three complementary skills for auditing, measuring, and maintaining Claude Code ecosystem health. **Audit → measure → clean:** identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve outcomes, prune what doesn't pull its weight.
 
 [![license](https://img.shields.io/github/license/wan-huiyan/claude-ecosystem-hygiene)](LICENSE)
 [![last commit](https://img.shields.io/github/last-commit/wan-huiyan/claude-ecosystem-hygiene)](https://github.com/wan-huiyan/claude-ecosystem-hygiene/commits)
@@ -8,12 +8,29 @@ Two complementary skills for auditing and maintaining Claude Code ecosystem heal
 
 ![Ecosystem Audit Demo](docs/demo-screenshot.png)
 
+## The audit → measure → clean pipeline
+
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌────────────────┐
+│ ecosystem-audit │ ──▶ │ claude-code-ab-     │ ──▶ │ memory-hygiene │
+│                 │     │ harness             │     │                │
+│ which artifacts │     │ do the HOT ones     │     │ prune what the │
+│ are HOT vs      │     │ actually improve    │     │ harness showed │
+│ DORMANT?        │     │ task outcomes?      │     │ adds no value  │
+│                 │     │                     │     │                │
+│ minutes, $0     │     │ 30min–3hrs, $10+    │     │ minutes, $0    │
+└─────────────────┘     └─────────────────────┘     └────────────────┘
+```
+
+Reference counts are a starting point, not a verdict. `ecosystem-audit` catches DORMANT artifacts cheaply. But a HOT artifact might still be noise — it gets touched and adds nothing. Only the A/B harness can separate "HOT and useful" from "HOT and ritual." When ≥5 tasks show no outcome change under ablation, `memory-hygiene` has a concrete signal to consolidate or delete.
+
 ## What's Inside
 
-| Plugin | What it does |
-|--------|--------------|
-| [`ecosystem-audit`](plugins/ecosystem-audit/) | Full-coverage audit across 9 artifact categories (skills, memory, handoffs, ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real skill invocation data. Produces interactive HTML report with radar chart and prioritized P0/P1/P2 cleanup actions. |
-| [`memory-hygiene`](plugins/memory-hygiene/) | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
+| Plugin | Stage | What it does |
+|--------|-------|--------------|
+| [`ecosystem-audit`](plugins/ecosystem-audit/) | **Audit** | Full-coverage audit across 9 artifact categories (skills, memory, handoffs, ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real skill invocation data. Produces interactive HTML report with radar chart and prioritized P0/P1/P2 cleanup actions. |
+| [`claude-code-ab-harness`](plugins/claude-code-ab-harness/) | **Measure** | Counterfactual A/B + layered-ablation harness. Runs each task twice (setup-ON vs setup-OFF) or strips one layer at a time from a full baseline, then reports turns, tool calls, cost, and pitfall-keyword hits. **Heavyweight: $10–$80, 30min–3hrs.** Pair with the audit to turn reference-count signals into actual quality measurements. |
+| [`memory-hygiene`](plugins/memory-hygiene/) | **Clean** | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
 
 > **Moved:** `skill-trigger-eval-subprocess-blindness` lived here in v1.0.0 but has been
 > relocated to [`wan-huiyan/claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring)
@@ -33,17 +50,32 @@ claude: *triggers ecosystem-audit*
         → writes cleanup script as P0 action
 
 you: *opens docs/handoffs/ecosystem_audit_report.html*
-     sees 8.9% skill utilization, 147 niche-dormant skills safe to uninstall,
-     exposed API key in .env flagged as P0-security
+     sees 8.9% skill utilization, 147 niche-dormant skills safe to uninstall.
+     wonders: of the 35 invoked skills, which ones actually improve answers?
+
+claude: *triggers claude-code-ab-harness*
+        → validates CLAUDE_CONFIG_DIR=/tmp/claude-empty probe
+        → runs 3 hand-picked tasks twice each on setup-ON vs setup-OFF
+        → mines session JSONLs for turns, cost, pitfall keywords
+        → on n=3: setup prevented 1 of 3 pitfalls (33%), no turn savings
+        → recommends layered ablation next for per-layer attribution
+
+you: ok, now i know which layers earn their keep. what do i actually delete?
+
+claude: *triggers memory-hygiene*
+        → consumes the ranked layer-contribution list from the harness
+        → flags the 8 zero-Δ layers as consolidation candidates
+        → applies Cowan cap, MEMORY.md 200-line threshold, lesson dedup
 ```
 
 ## Installation
 
-### Install both (recommended)
+### Install all three (recommended)
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
 claude plugin install ecosystem-audit@wan-huiyan-ecosystem-hygiene
+claude plugin install claude-code-ab-harness@wan-huiyan-ecosystem-hygiene
 claude plugin install memory-hygiene@wan-huiyan-ecosystem-hygiene
 ```
 
@@ -52,25 +84,32 @@ claude plugin install memory-hygiene@wan-huiyan-ecosystem-hygiene
 ```bash
 git clone https://github.com/wan-huiyan/claude-ecosystem-hygiene.git /tmp/ceh
 cp -r /tmp/ceh/plugins/ecosystem-audit ~/.claude/skills/
+cp -r /tmp/ceh/plugins/claude-code-ab-harness ~/.claude/skills/
 cp -r /tmp/ceh/plugins/memory-hygiene ~/.claude/skills/
 ```
 
 > **Note:** `memory-hygiene` is also available as a standalone repo at
 > [`wan-huiyan/memory-hygiene`](https://github.com/wan-huiyan/memory-hygiene).
 > Installing from either source yields the same skill. Use this bundle if you want
-> it alongside `ecosystem-audit`; use the standalone repo if you only want memory-hygiene.
+> it alongside the audit and A/B harness; use the standalone repo if you only want memory-hygiene.
 
 ## How They Fit Together
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ecosystem-audit            Scope: the WHOLE ecosystem      │
+│  ecosystem-audit               Scope: the WHOLE ecosystem   │
 │    ├─ parses JSONL session logs for skill usage             │
 │    ├─ calls memory-hygiene thresholds inline                │
 │    ├─ scans handoffs, ADRs, worktrees, automation           │
 │    └─ produces interactive HTML with radar chart            │
 ├─────────────────────────────────────────────────────────────┤
-│  memory-hygiene             Scope: persistent knowledge     │
+│  claude-code-ab-harness        Scope: outcome measurement   │
+│    ├─ CLAUDE_CONFIG_DIR clean-env mechanism                 │
+│    ├─ binary A/B (setup-ON vs setup-OFF)                    │
+│    ├─ 12-cell layered ablation (strip one layer at a time)  │
+│    └─ ranked contribution list feeds back into pruning      │
+├─────────────────────────────────────────────────────────────┤
+│  memory-hygiene                Scope: persistent knowledge  │
 │    ├─ MEMORY.md bloat (>200 lines = truncation risk)        │
 │    ├─ axioms cap (Cowan 2001 = 12 items max)                │
 │    ├─ lessons dedup + tier placement                        │
@@ -79,10 +118,21 @@ cp -r /tmp/ceh/plugins/memory-hygiene ~/.claude/skills/
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Run `ecosystem-audit` to see the big picture. When it flags memory issues, drop into
-`memory-hygiene` for concrete fixes. For skill-authoring tooling (including the
-subprocess-blindness diagnostic), see
-[`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring).
+Run `ecosystem-audit` to see the big picture. Point `claude-code-ab-harness` at the HOT artifacts it flagged to see which ones actually change outcomes. When the harness or the audit flags memory issues, drop into `memory-hygiene` for concrete fixes. For skill-authoring tooling (including the subprocess-blindness diagnostic), see [`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring).
+
+## What to do with A/B harness results
+
+The A/B harness emits a ranked layer-contribution list — e.g., on one real run
+(see [`plugins/claude-code-ab-harness/examples/layered_ablation_example.md`](plugins/claude-code-ab-harness/examples/layered_ablation_example.md))
+only 2 of 10 ablated layers had measurable pitfall-prevention loss at n=1.
+The other 8 were zero-delta strips. That's the signal `memory-hygiene` is
+designed to consume:
+
+- **Δ pitfalls = 0 AND Δ cost > 0 when stripped** → layer adds cost without catching anything on the measured task set. Candidate for consolidation.
+- **Δ pitfalls < 0** → layer earned its keep. Keep (or invest more in it).
+- **Δ pitfalls = 0 AND Δ cost ≤ 0 when stripped** → layer costs nothing to keep but didn't provably help either. Leave alone, re-evaluate next audit.
+
+Remember the limitations: n=1 rankings tie within noise below the top two slots, and the task set upward-biases pitfall-prevention. Use the harness as evidence for pruning decisions, not proof.
 
 ## What You Get
 
@@ -151,6 +201,7 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 
 ## Version History
 
+- **v1.2.0** (2026-04-24) — **Added `claude-code-ab-harness` v1.1.0** to complete the audit → measure → clean pipeline. The harness is heavyweight ($10–$80, 30min–3hrs) but converts `ecosystem-audit`'s reference-count signals into real outcome measurements, and produces a ranked layer-contribution list that `memory-hygiene` can consume. Includes sanitized example outputs from the 2026-04-21 binary A/B (27 vs 30 turns, 1 of 3 pitfalls prevented) and the 2026-04-23 layered ablation (skills+plugins −2/3 and lessons.md −1/3 were the only non-zero-Δ strips). Marketplace copy is canonical for this plugin — no cross-repo sync job.
 - **v1.1.0** (2026-04-17) — **ecosystem-audit bumped to v1.1.0** (memory-hygiene v3.0 alignment): Memory subagent now delegates to memory-hygiene Phase 1 (single source of truth; prevents drift); T1.5 tier coverage added (`~/.claude/templates/phase_*.md` + `.claude/rules/phase-*.md` with `paths:` glob validity); axiom health now checks classification (Universal/Role/Phase), not just raw count vs Cowan cap; staleness expanded from 2 to 4 signals + agency-aware detection via `user_role.md`; radar chart renders `N/A` with hatched pattern when sub-checks can't compute (no fabricated scores); Memory weighting rebalanced to 6 inputs (25/15/15/10/20/15). Also moved `skill-trigger-eval-subprocess-blindness` to [`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring); it was out of scope for this marketplace.
 - **v1.0.0** (2026-04-16) — Initial bundle release. Contains ecosystem-audit v1.0.0, memory-hygiene v3.0.0, skill-trigger-eval-subprocess-blindness v1.0.0.
 
