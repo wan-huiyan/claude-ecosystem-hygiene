@@ -1,5 +1,7 @@
 ---
 name: ecosystem-audit
+version: 1.2.0
+updated: 2026-04-25
 description: >
   ALWAYS use this skill when the user asks any question about their Claude Code setup, installed
   skills, memory system, handoffs, worktrees, or ~/.claude directory health. This is the
@@ -200,6 +202,56 @@ Actions are classified by urgency:
 - **P1 (This Week)**: Stale artifact cleanup, threshold violations, worktree removal
 - **P2 (This Month)**: Archival, consolidation, lessons triage, ongoing monitoring
 
+### T1 Promotion Criteria (v1.2.0)
+
+T1 means **evidence-backed load-bearing**, not merely "frequently referenced." High
+reference count alone does not predict A/B contribution — the v3 layered ablation
+(240 cells, n=15) found that `lessons.md` (highest-ref layer) had a Δ within noise,
+while `skills+plugins` (lower ref count) cleanly separated from the noise floor
+(pitfall-avoided rate 80% → 43% when stripped).
+
+To promote a layer to T1, require **one** of:
+
+| Evidence path | Field | Effect in report |
+|---|---|---|
+| A/B-harness result above noise floor | `ab_evidence.delta_vs_noop_se >= 1.0` | Clean T1 — no disclaimer |
+| No harness data yet | `evidence: "reference-count-only"` | T1 with explicit disclaimer shown |
+
+If neither condition is met, `score_health.py` emits a `t1_warnings` entry. The
+audit report **must** surface this warning — a silently-promoted T1 erodes trust in
+the tier system.
+
+Cross-reference: ab-harness v1.2.0 §"Noise floor: design a no-op cell" and
+§"C11 saturation: everything-stripped ties the no-op control."
+
+### Correctness-vs-Latency Annotation (v1.2.0)
+
+The v3 finding that `skills+plugins` (cell C4) was the **fastest** cell on generic
+tasks (7.2 turns / $0.30 vs C0's 18.8 turns / $0.57) means skills add latency on
+routine work even when they help on pitfall-prone tasks. Do **not** blanket-recommend
+"install more skills."
+
+For each **skill-type layer**, annotate with:
+
+| Field | Source | Values |
+|---|---|---|
+| `pitfall_benefit` | Existing T1/T1.5/T2 tier | T1 / T1.5 / T2 |
+| `latency_cost` | `ab_evidence.latency_turns_generic` | `low` (<1 turn) / `medium` (1–3) / `high` (>3) / `unmeasured` |
+| `trigger_surface_match` | `ref_count` vs `delta_vs_noop_se` | `matched` / `mismatched` / `unmeasured` |
+
+**Mismatch pattern:** `ref_count > 10` AND `delta_vs_noop_se < 1.0`. This is the
+v3 signature of a skill that's frequently seen but adds latency on generic tasks
+without reducing pitfalls on the user's measured workload.
+
+Skills with `trigger_surface_match == "mismatched"` feed the new **"Skills with
+mismatched trigger surface"** report section (see Phase 3).
+
+**Updated recommendation engine logic:**
+- Mine recent session prompts for dominant task-type patterns before recommending any skill
+- Recommend only skills whose trigger surface matches the user's common pitfall patterns
+- Flag high-ref / low-A/B-signal skills as "noise" — they add latency without pitfall benefit
+- Do NOT blanket-recommend installing more skills
+
 ## Phase 3: Report
 
 Generate two output files:
@@ -220,6 +272,23 @@ Save to `docs/handoffs/ecosystem_audit_report.html` with:
 - Features: sticky sidebar nav, tabbed data views, radar chart (6 axes),
   animated counters, hover tooltips, bar charts, priority-coded action cards
 
+#### Skills with Mismatched Trigger Surface (v1.2.0)
+
+When `trigger_surface_mismatches` is non-empty, add a section to both markdown and
+HTML reports listing each mismatched skill with:
+
+- Skill name
+- `ref_count` (how often it appeared in session logs)
+- `delta_vs_noop_se` (A/B signal strength vs no-op control)
+- `latency_cost` (estimated turn overhead on generic tasks)
+- Recommendation: review trigger description, narrow scope to pitfall-prone tasks only, or deprecate
+
+If no mismatches, omit the section entirely.
+
+Also emit a T1 warning block when `t1_warnings` is non-empty, listing each affected
+layer by name with the remediation options (add `ab_evidence` or set
+`evidence: "reference-count-only"`).
+
 ### Radar Chart Data
 
 The radar chart shows 6 axes: Skills, Memory, Handoffs, ADRs, Docs, Worktrees.
@@ -235,6 +304,10 @@ Two overlaid polygons:
 
 This skill is designed to work alongside, not replace:
 
+- **ab-harness** (v1.2.0+): Counterfactual A/B + layered-ablation harness. Run to generate
+  the `ab_evidence` fields this skill uses for T1 validation and latency annotation.
+  Key sections: §"Noise floor: design a no-op cell" (threshold calibration) and
+  §"C11 saturation: everything-stripped ties the no-op control" (why all-stripped ≠ signal).
 - **schliff:doctor**: Structural quality scoring of individual SKILL.md files (7-dimension
   scoring). Run after ecosystem-audit identifies dormant skills to assess whether they're
   worth keeping based on quality.
