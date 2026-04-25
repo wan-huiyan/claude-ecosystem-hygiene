@@ -49,6 +49,20 @@
       "prompt": "I told Claude to remember that we use snake_case for all column names in this project but next session it forgot again. Is my memory system set up correctly? Are my feedback files actually being read?",
       "expected_output": "Diagnostic audit of memory persistence: check if MEMORY.md index is loaded, verify feedback files have proper frontmatter, check if the project rule was actually written to a file, verify tier placement (should be T2 topic file or CLAUDE.md workflow rule).",
       "files": []
+    },
+    {
+      "id": 8,
+      "name": "t1-warning-explanation",
+      "prompt": "The ecosystem audit report shows a t1_warning for lessons.md saying it lacks A/B evidence. What does this mean and what should I do?",
+      "expected_output": "Explains that T1 now means evidence-backed load-bearing (v1.2.0 change). lessons.md has high reference count but no A/B-harness result confirming it reduces pitfalls above the noise floor (delta_vs_noop_se >= 1.0 SE). Options: (1) run ab-harness to generate evidence — specifically a layered ablation that strips lessons.md and measures pitfall-avoided rate delta vs the no-op control cell, or (2) add evidence='reference-count-only' as an explicit disclaimer if A/B testing is not feasible. References ab-harness v1.2.0 noise-floor design. Notes v3 finding: high ref count alone does not predict A/B contribution.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "name": "trigger-surface-mismatch-report",
+      "prompt": "My ecosystem audit report has a 'Skills with mismatched trigger surface' section listing three of my skills. Can you explain what this means and what to do about each one?",
+      "expected_output": "Explains that mismatched skills have high reference count (appear often in session logs) but low A/B signal (delta_vs_noop_se < 1.0 SE vs no-op control). They add latency on generic tasks without measurably reducing pitfalls on the user's measured workload — the v3 ablation pattern. For each listed skill: (1) review trigger description to see if it fires too broadly on non-pitfall tasks, (2) narrow scope to specific pitfall-prone contexts only, or (3) deprecate if the user's task mix rarely hits the pitfall the skill is designed for. Recommends running ab-harness layered ablation on each suspect skill before deciding. Notes that regex-OR grading over-calls ~3x so mismatch signals should be verified with LLM-rubric scoring.",
+      "files": []
     }
   ]
 }
