@@ -45,6 +45,62 @@ def score_docs(active: int, total: int) -> float:
     """Plans + reviews + findings + tasks."""
     return round(100 * active / total, 1) if total else 100.0
 
+def annotate_layer_tier(harness_layer: dict | None, noise_floor_pp: float | None) -> dict:
+    """Annotate a layer with a noise-floor tier (v1.2.0).
+
+    Consumes one entry from claude-code-ab-harness v1.2.0+ output:
+        {"name": "skills", "delta_pp": -37.1, "n_covered": 15, "tier": "T1"}
+
+    Returns {"tier": "T1|T1.5|T2|T3|T?", "evidence": "..."} where T? means no
+    harness evidence is available (never inferred from reference count).
+    """
+    if harness_layer is None or noise_floor_pp is None:
+        return {"tier": "T?", "evidence": "no_harness_output"}
+    n = harness_layer.get("n_covered", 0)
+    if n < 10:
+        return {"tier": "T?", "evidence": f"n_covered={n} < 10 minimum"}
+    # Prefer harness-provided tier (the harness has the full per-cell variance
+    # data we don't ship here). Fall back to a simple distance-from-noise rule
+    # using a 1σ ≈ √(0.25/n)·100 sampling-error bound.
+    if "tier" in harness_layer and harness_layer["tier"] in {"T1", "T1.5", "T2", "T3"}:
+        return {"tier": harness_layer["tier"], "evidence": "harness_provided"}
+    import math
+    sigma_pp = math.sqrt(0.25 / max(n, 1)) * 100  # ~12.9pp at n=15
+    delta = abs(harness_layer.get("delta_pp", 0.0))
+    distance_from_noise = delta - noise_floor_pp
+    if distance_from_noise >= sigma_pp:
+        return {"tier": "T1", "evidence": f"|Δ|−noise={distance_from_noise:.1f}pp ≥ 1σ={sigma_pp:.1f}pp (n={n})"}
+    if distance_from_noise >= 0:
+        return {"tier": "T1.5", "evidence": f"|Δ|−noise={distance_from_noise:.1f}pp (within 1σ above noise, n={n})"}
+    if delta > 0.0:
+        return {"tier": "T2", "evidence": f"|Δ|={delta:.1f}pp ≤ noise={noise_floor_pp:.1f}pp (n={n})"}
+    return {"tier": "T3", "evidence": f"ties no-op floor (n={n})"}
+
+
+def score_skill_trigger_match(skill: dict, user_pitfall_categories: list[str] | None) -> dict:
+    """Decide whether a HOT skill has a mismatched trigger surface (v1.2.0).
+
+    skill: {"name": str, "invocation_count": int, "domain_tags": [str, ...], "p50_rank": int}
+    user_pitfall_categories: top-N unaddressed pitfall categories from ab-harness output.
+
+    Returns {"mismatched": bool, "recommendation": str, "reason": str}.
+    Never blanket-recommends "install more skills" — only flags HOT-but-mismatched.
+    """
+    if user_pitfall_categories is None:
+        return {"mismatched": False, "recommendation": "skip", "reason": "no_harness_pitfall_tags"}
+    if skill.get("p50_rank", 100) > 50:
+        return {"mismatched": False, "recommendation": "skip", "reason": "not_in_top_50pct"}
+    domain_tags = set(skill.get("domain_tags", []))
+    pitfalls = set(user_pitfall_categories[:3])
+    if domain_tags & pitfalls:
+        return {"mismatched": False, "recommendation": "keep", "reason": "trigger_matches_pitfall"}
+    return {
+        "mismatched": True,
+        "recommendation": "uninstall_or_scope_narrow",
+        "reason": f"top_pitfalls={sorted(pitfalls)} disjoint from skill_tags={sorted(domain_tags)}",
+    }
+
+
 def score_worktrees(worktrees: list[dict]) -> float:
     """Lifecycle score: weighted average by state.
 
@@ -102,6 +158,24 @@ def main():
         "worktrees": score_worktrees(data.get("worktrees", [])),
     }
     scores["overall"] = round(sum(scores.values()) / len(scores), 1)
+
+    # v1.2.0: annotate per-layer tier from optional harness output
+    harness = data.get("ab_harness") or {}
+    noise = harness.get("noise_floor_pp")
+    layers_by_name = {l.get("name"): l for l in harness.get("layers", [])}
+    scores["tiers"] = {
+        axis: annotate_layer_tier(layers_by_name.get(axis), noise)
+        for axis in ("skills", "memory", "handoffs", "adrs", "docs", "worktrees")
+    }
+
+    # v1.2.0: skills correctness-vs-latency overlay (signed Δ vs no-op control)
+    skills_harness = layers_by_name.get("skills") or {}
+    scores["skills_overlay"] = {
+        "correctness_delta_pp": skills_harness.get("delta_pp"),
+        "latency_delta_turns": skills_harness.get("delta_turns"),
+        "latency_delta_dollars": skills_harness.get("delta_dollars"),
+        "covered_n": skills_harness.get("n_covered"),
+    }
 
     print(json.dumps(scores, indent=2))
 

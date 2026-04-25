@@ -10,8 +10,8 @@
     {
       "name": "ecosystem-audit",
       "source": "./plugins/ecosystem-audit",
-      "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. Produces an interactive HTML report with radar chart.",
-      "version": "1.1.0"
+      "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. v1.2.0 adds A/B-evidence-backed noise-floor tier annotations (T1/T1.5/T2/T3) and a correctness-vs-latency overlay for the Skills layer. Produces an interactive HTML report with radar chart.",
+      "version": "1.2.0"
     },
     {
       "name": "ab-harness",
