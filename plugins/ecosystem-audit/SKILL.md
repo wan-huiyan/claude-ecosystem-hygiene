@@ -22,11 +22,34 @@ description: >
   don't explicitly ask for an "audit".
 ---
 
-# Ecosystem Audit
+# Ecosystem Audit (v1.2.0)
 
 A comprehensive audit of the entire `~/.claude/` ecosystem that scans 9 categories of persistent
 artifacts, scores each on a health scale, and produces an interactive HTML dashboard with
 prioritized cleanup recommendations.
+
+## What changed in v1.2.0
+
+The 2026-04-25 layered ablation (240 cells, n=15/cell, $155) showed that **reference count
+alone does not predict pitfall-prevention value**. Only the `~/.claude/{skills,plugins}` layer
+(C4) cleanly separated from the no-op noise floor. `lessons.md` (C3) — the highest-referenced
+artifact — landed within noise at n=15. v1.2.0 surfaces this directly:
+
+1. **A/B-evidence-backed tier annotations.** Layers are labeled T1 (above noise floor),
+   T1.5 (marginal / project-specific), T2 (within noise), or T3 (ties no-op floor). T1
+   requires harness evidence — not reference count. If no evidence is available, layers
+   render as `T?` with a stated-uncertainty disclaimer rather than a fabricated tier.
+2. **Correctness-vs-latency overlay for the Skills axis.** Skills carry positive A/B signal
+   on pitfall-prone tasks but add latency on routine work. The Skills axis now reports
+   *both* a correctness score and a latency-cost annotation; the recommendation engine
+   stops blanket-recommending "install more skills."
+3. **Mismatched trigger-surface flag.** A new section in the audit report lists skills that
+   fire often but whose specialty does not align with the user's actual task pitfalls (per
+   harness output). These are candidates for unloading even if their JSONL invocation rate
+   is high.
+
+The change is additive: Phase 1/2 scans are unchanged; Phase 2 gains a tier-annotation step
+that consumes `claude-code-ab-harness` v1.2.0+ output; Phase 3 reports the overlay.
 
 ## When to Use
 
@@ -166,6 +189,19 @@ because "healthy" means different things for different artifact types.
 **Skills**: `active_count / total_installed * 100`
 Simple utilization rate. Active = invoked in the log window.
 
+**Skills correctness-vs-latency overlay (v1.2.0).** When `claude-code-ab-harness` output is
+available, the Skills axis reports two numbers, not one:
+- **Correctness delta** (Δ pitfall-avoidance % vs no-op control). Positive = skills help
+  on pitfall-prone tasks. From layered-ablation v3, Skills+plugins (C4) showed
+  −37.1pp under-strip, the largest signal of any layer.
+- **Latency cost** (Δ turns and Δ $ vs no-op control on *uncovered* tasks). Skills add
+  latency on routine work — v3 found C4 actually ran faster than C0 on uncovered tasks
+  (7.2 turns / $0.30 vs 18.8 / $0.57), so latency is reported as a *signed* delta, not
+  a one-way penalty.
+
+If the harness has not been run, render Latency as `N/A` and note it in the Coverage
+section. Do not fabricate a latency annotation from JSONL alone.
+
 **Memory**: Weighted composite of sub-checks, computed from memory-hygiene's Discover report:
 - MEMORY.md line count vs threshold (weight: 25%)
 - Frontmatter compliance rate, incl. `type` enum validity (weight: 15%)
@@ -192,6 +228,64 @@ Each worktree is scored individually based on its lifecycle state, then averaged
 - ABANDONED (unmerged branch, >14 days old): 0%
 
 If 0 worktrees exist, score is 100% (nothing to manage, nothing mismanaged).
+
+### Phase 2.5: Noise-Floor Tier Annotation (v1.2.0)
+
+After the per-axis health scores compute, annotate each layer with a noise-floor tier.
+Tiers are NOT a derivative of reference count — they reflect whether that layer carries
+A/B signal above the no-op control floor.
+
+**Tier map:**
+| Tier | Definition | Evidence required |
+|------|------------|-------------------|
+| **T1** | Above noise floor — strip-Δ ≥ 1.5σ from no-op control | Harness result with n ≥ 10 covered tasks per cell |
+| **T1.5** | Marginal — strip-Δ between 0.5σ and 1.5σ, OR project-specific signal that does not generalize | Harness result OR documented per-project finding |
+| **T2** | Within noise — strip-Δ < 0.5σ from no-op | Harness result |
+| **T3** | Ties no-op floor — "everything stripped" cell agrees with this layer's strip cell | Harness result |
+| **T?** | No harness evidence available | None — surface as stated-uncertainty in the report |
+
+**Where the harness output comes from.** Consume `claude-code-ab-harness` v1.2.0+'s
+ranked layer-contribution table (per its SKILL.md output contract). Required schema:
+```json
+{
+  "version": "1.2.0+",
+  "layers": [
+    {"name": "skills", "delta_pp": -37.1, "n_covered": 15, "tier": "T1"},
+    {"name": "lessons", "delta_pp": -22.9, "n_covered": 15, "tier": "T2"},
+    ...
+  ],
+  "noise_floor_pp": 26.7,
+  "agreement_with_no_op": {"strip_all_cell": "C11", "no_op_cell": "C6", "delta_pp": 0.0}
+}
+```
+
+**Version-pin check:** ab-harness major version is pinned at v1.2. If the installed
+harness is older or missing, render every tier annotation as `T?` and list the missing
+input as a coverage blocker. Never infer T1 from JSONL invocation rate alone — a frequently
+fired skill can still be ritual.
+
+**Recommendation engine implication.** When generating P0/P1/P2 actions, do NOT recommend
+"install more skills" as a generic remediation. Only recommend specific skills whose
+triggers match unaddressed user pitfalls (see Skills with Mismatched Trigger Surface
+below). For T2/T3 layers, the recommendation defaults to "review for prune" rather than
+"continue investing."
+
+### Skills with Mismatched Trigger Surface (v1.2.0)
+
+A skill is **mismatched** when both:
+1. Its JSONL invocation rate is in the top 50% of installed skills (HOT by reference), AND
+2. The harness shows that the user's recurring pitfalls are NOT in the skill's trigger
+   domain — i.e., when the harness reports per-task pitfall categories, none of the
+   user's top-3 unresolved pitfall categories match this skill's domain tags.
+
+**Output:** a section in the audit report titled "Skills with Mismatched Trigger Surface"
+listing each mismatched skill with: invocation count (last 30 days), advertised trigger
+categories, user's top unaddressed pitfall categories, and a recommendation
+(uninstall / scope-narrow / keep-and-monitor).
+
+**Coverage caveat.** This section requires per-task pitfall tagging from ab-harness.
+If unavailable, omit the section entirely with a Coverage note rather than guessing
+domain alignment from skill description text.
 
 ### Priority Classification
 
@@ -228,6 +322,12 @@ Each axis shows the health percentage from Phase 2 scoring.
 Two overlaid polygons:
 - **Teal (active/healthy)**: the health score per category
 - **Red (dormant/stale)**: the complement (100% - health)
+
+**Tier badges per axis (v1.2.0).** Each axis label gets a tier badge from Phase 2.5:
+T1 (solid teal), T1.5 (outlined teal), T2 (gray), T3 (red), T? (hatched). The legend
+explains the badge palette and notes that tiers reflect A/B harness evidence, not
+reference count. The Skills axis additionally shows two values: a correctness score
+(the polygon vertex) and a latency annotation (signed Δ turns) below the axis label.
 
 **Never fabricate a score.** If any sub-check for an axis could not be computed (e.g., memory-hygiene unavailable, `user_role.md` missing, version mismatch), render that axis as `N/A` with a hatched pattern and list blockers in the report's "Coverage" section. A partial average is worse than a missing reading.
 
