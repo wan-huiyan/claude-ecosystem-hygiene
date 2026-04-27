@@ -23,7 +23,7 @@
       "name": "memory-hygiene",
       "source": "./plugins/memory-hygiene",
       "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs.",
-      "version": "3.0.0"
+      "version": "3.1.0"
     },
     {
       "name": "doc-freshness-reverse-lint",
@@ -34,7 +34,7 @@
     {
       "name": "test-effectiveness-auditor",
       "source": "./plugins/test-effectiveness-auditor",
-      "description": "Quantitatively measure how effective a project's automated test suite is at catching real bugs, by replaying historical incidents at pre-fix commits and classifying CI failure history. Sibling 'measure' tool to ab-harness — ab-harness measures whether your Claude Code stack improves outcomes, this measures whether your project's tests do. Bundled from wan-huiyan/test-effectiveness-auditor.",
+      "description": "Quantitatively measure how effective a project's automated test suite is at catching real bugs, by replaying historical incidents at pre-fix commits and classifying CI failure history. Sibling 'measure' tool to ab-harness \u2014 ab-harness measures whether your Claude Code stack improves outcomes, this measures whether your project's tests do. Bundled from wan-huiyan/test-effectiveness-auditor.",
       "version": "1.0.0"
     }
   ]
