@@ -22,14 +22,14 @@
     {
       "name": "memory-hygiene",
       "source": "./plugins/memory-hygiene",
-      "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, and ADRs.",
-      "version": "3.1.0"
+      "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, ADRs, and the project docs/ taxonomy. v3.3 defines the canonical 7-bucket docs/ taxonomy session-handoff dispatches to and adds label-table integrity audit.",
+      "version": "3.3.0"
     },
     {
       "name": "doc-freshness-reverse-lint",
       "source": "./plugins/doc-freshness-reverse-lint",
-      "description": "Detect stale normative guidance in project docs/ after a correction lands in lessons.md / axioms.md / feedback_*.md. Event-driven PostToolUse hook + weekly cron audit. Lists file:line candidate stale claims \u2014 never auto-edits. Conservative guardrails prevent false positives on qualified or rephrased content.",
-      "version": "1.0.0"
+      "description": "Detect stale normative guidance in project docs/ after a correction lands in lessons.md / axioms.md / feedback_*.md. Event-driven PostToolUse hook + weekly cron audit. Also audits ~/.claude/skills/ for expired last_verified frontmatter (axiom #21). Invoked by session-handoff Phase 4. Lists file:line candidate stale claims \u2014 never auto-edits.",
+      "version": "1.2.0"
     },
     {
       "name": "test-effectiveness-auditor",

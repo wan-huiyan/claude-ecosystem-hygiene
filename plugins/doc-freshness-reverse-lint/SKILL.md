@@ -1,19 +1,25 @@
 ---
 name: doc-freshness-reverse-lint
 description: |
-  Detect stale normative guidance in project docs/ after the user adds a NEW "don't X / avoid Y"
+  Detect stale normative guidance after the user adds a NEW "don't X / avoid Y"
   rule to ~/.claude/lessons.md, ~/.claude/axioms.md, or any
-  ~/.claude/projects/<slug>/memory/feedback_*.md. Trigger when: (1) a PostToolUse hook fires on
-  Edit|Write to one of those memory files and the diff contains a new negation rule;
-  (2) user asks "are my project docs still consistent with my lessons / feedback?",
-  "any stale advice in docs/?", "run doc freshness audit"; (3) weekly cron audit is due.
-  Produces a list of CANDIDATE stale claims — file:line refs only. NEVER auto-edits. Conservative
-  by design: only surfaces when the new rule has an explicit negation (don't / never / avoid / stop)
-  AND a multi-token searchable phrase AND ≥1 grep hit in project docs/{research,decisions,findings,runbooks}/
-  or project MEMORY.md. If zero hits, the skill exits silent — do not announce "nothing to do".
+  ~/.claude/projects/<slug>/memory/feedback_*.md. Also audits ~/.claude/skills/
+  for skills whose `last_verified` frontmatter has expired or that opt into a
+  freshness contract without declaring one (axiom #21). Trigger when: (1) a
+  PostToolUse hook fires on Edit|Write to one of those memory files and the diff
+  contains a new negation rule; (2) user asks "are my project docs still consistent
+  with my lessons / feedback?", "any stale advice in docs/?", "run doc freshness audit",
+  "any stale skills?"; (3) weekly cron audit is due. Produces a list of CANDIDATE
+  stale claims — file:line refs only. NEVER auto-edits. Conservative by design:
+  for prose lint, surfaces only when the new rule has an explicit negation
+  (don't / never / avoid / stop) AND a multi-token searchable phrase AND ≥1 grep hit.
+  For skill freshness, the default mode flags only on EXPLICIT frontmatter signals
+  (expired `last_verified`, or `scope: project-specific` without `last_verified`);
+  the heuristic project-marker scan is opt-in via `--scan-untagged`. If zero hits,
+  the skill exits silent.
 author: Claude (for Huiyan, 2026-04-24)
-version: 1.0.0
-date: 2026-04-24
+version: 1.2.0
+date: 2026-05-15
 ---
 
 # Doc Freshness Reverse-Lint
@@ -40,6 +46,46 @@ greps project docs, lists matches. Does NOT edit.
 Scans `docs/**/*.md` for normative claims, cross-checks against recent `lessons.md`
 entries, flags contradictions.
 
+### 3. Skill freshness audit (per axiom #21)
+
+Scans `~/.claude/skills/<name>/SKILL.md` for two explicit signals:
+
+- **`last_verified` exceeded `staleness_window_days`** (default 90): the skill
+  declared a freshness contract and has aged past it. Re-verify the cited config
+  / CLI surface and bump `last_verified`.
+- **`scope: project-specific` without `last_verified`**: the skill declared
+  itself project-scoped but didn't supply the freshness contract that scope
+  requires. Add `last_verified: YYYY-MM-DD` (and optionally `staleness_window_days`).
+
+Default mode is **silent unless explicit signals are present** — zero false
+positives on skills that opted out of the freshness contract. An opt-in
+`--scan-untagged` mode runs a tighter heuristic scan (3-part BQ refs requiring a
+hyphen in the project segment, GCS/GCR URIs, real user paths, `--project=`
+flags) over skills that have NO `last_verified` at all, surfacing candidates for
+manual tagging. Use the heuristic mode for periodic audit; never wire it into a
+hook (its precision is too low for real-time interrupt).
+
+### 4. Invocation by `session-handoff` (v1.2.0+)
+
+`session-handoff` invokes both mechanisms at end-of-session:
+
+- **Phase 4 step 24** runs `reverse_lint.py` against every `lessons.md` /
+  `axioms.md` / `feedback_*.md` touched this session. Candidates appear in a
+  "Stale docs to review" section of the handoff doc.
+- **Phase 4 step 24b** runs `skill_freshness_audit.py` when any SKILL.md was
+  edited this session, flagging expired `last_verified` and project-scoped
+  skills missing the freshness contract.
+
+Both are non-blocking: zero candidates → exit silent; script not installed →
+log and continue. `session-handoff` Phase 6 surfaces non-empty candidates back
+to the user in the live-dashboard recap when relevant.
+
+### 5. Invocation by `memory-hygiene` (v3.3+)
+
+After a `memory-hygiene` taxonomy migration (§1j moves files between buckets),
+run `reverse_lint.py` on the migration commit to catch references in handoff
+docs, plans, or skills that hard-code the old path.
+
 ## Invocation
 
 ```bash
@@ -50,6 +96,14 @@ python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/reverse_lint.py \
 # Weekly audit over a project
 python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/weekly_audit.py \
     --project-root /Users/huiyanwan/Documents
+
+# Skill freshness audit (default — silent unless explicit signals present)
+python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/skill_freshness_audit.py \
+    [--human] [--max-age-days 90] [--skills-root ~/.claude/skills]
+
+# Skill freshness audit with heuristic scan over untagged skills (audit-only)
+python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/skill_freshness_audit.py \
+    --scan-untagged --human
 ```
 
 Exit codes: `0` = ran cleanly (zero or more candidates). Candidate JSON goes to stdout;
@@ -139,6 +193,7 @@ conservative guardrails (no false positives on qualified or rephrased content).
 ## What this skill does NOT do
 
 - Does not read or interpret policy docs beyond literal + stem-normalized grep.
-- Does not modify any file.
+- Does not modify any file. Skill freshness audit is read-only too — it never edits frontmatter or bumps `last_verified` for you.
 - Does not replace manual review — every candidate needs a human judgment.
-- Does not scan code, only `.md` under the specified doc roots + project `MEMORY.md`.
+- Does not scan code. Reverse-lint and weekly-audit scan `.md` under specified doc roots + project `MEMORY.md`. Skill freshness audit scans `~/.claude/skills/<name>/SKILL.md` only (not `scripts/` or `evals/` inside skill bundles).
+- The `--scan-untagged` heuristic is opt-in for audit; do NOT wire it into a PostToolUse hook (precision is too low for real-time interrupt).
