@@ -1,6 +1,6 @@
 # Claude Code Ecosystem Hygiene
 
-Five complementary skills across two tracks. The **Claude-ecosystem track** (4 plugins) audits, measures, cleans, and keeps consistent your `~/.claude/` stack: identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve task outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them. The **project-quality track** (`test-effectiveness-auditor`) applies the same "measure don't guess" discipline to your project's own automated test suite — replays past bugs at pre-fix commits to quantify how many your tests actually catch.
+Six complementary skills across two tracks. The **Claude-ecosystem track** (4 plugins) audits, measures, cleans, and keeps consistent your `~/.claude/` stack: identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve task outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them. The **project-quality track** (`test-effectiveness-auditor` + `repo-hygiene`) applies the same "measure don't guess, clean before you ship" discipline to your project itself — measure how many real bugs your test suite actually catches, and clean the repo (stray data files, hardcoded paths, client data) before each PR.
 
 [![license](https://img.shields.io/github/license/wan-huiyan/claude-ecosystem-hygiene)](LICENSE)
 [![last commit](https://img.shields.io/github/last-commit/wan-huiyan/claude-ecosystem-hygiene)](https://github.com/wan-huiyan/claude-ecosystem-hygiene/commits)
@@ -33,6 +33,7 @@ Reference counts are a starting point, not a verdict. `ecosystem-audit` catches 
 | [`memory-hygiene`](plugins/memory-hygiene/) | **Clean** | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
 | [`doc-freshness-reverse-lint`](plugins/doc-freshness-reverse-lint/) | **Stay consistent** | Event-driven PostToolUse hook + weekly cron that catches project `docs/` contradicting the lessons that supersede them. When you add "don't sort by p-value" to `lessons.md`, the hook greps `docs/research/**` for literal matches and surfaces them as candidate stale claims — file:line only, never auto-edits. Conservative guardrails (explicit negation, multi-token phrase, one phrase per rule, silent on zero hits) prevent false positives on qualified content. |
 | [`test-effectiveness-auditor`](plugins/test-effectiveness-auditor/) | **Measure (project tests)** | Quantitatively answers "how many bugs do our tests actually catch?" Mines `docs/findings/`, `docs/issues/`, and git log fix commits, then for each incident checks out the pre-fix SHA in a temp worktree, runs the project's test command, and classifies as `caught` / `gap_testable` / `gap_hard` / `unrunnable`. Sibling 'measure' tool to `ab-harness` — ab-harness measures the Claude stack, this measures your project's own tests. Read-only, never auto-writes tests. Bundled from [`wan-huiyan/test-effectiveness-auditor`](https://github.com/wan-huiyan/test-effectiveness-auditor). |
+| [`repo-hygiene`](plugins/repo-hygiene/) | **Clean (project repo)** | Pre-PR checklist that catches the repo-level mistakes that cost hours later: data files committed to git (`.csv`/`.db`/`.parquet`), hardcoded `/Users/` paths, tracked runtime artifacts, branch-ownership confusion, internal docs drifting from deliverables, and **client data in public repos**. Every item came from a real incident. Run it before `gh pr create`, before merging, or at handover — the project-quality track's 'clean' tool, sibling to `test-effectiveness-auditor`. |
 
 > **Moved:** `skill-trigger-eval-subprocess-blindness` lived here in v1.0.0 but has been
 > relocated to [`wan-huiyan/claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring)
@@ -72,7 +73,7 @@ claude: *triggers memory-hygiene*
 
 ## Installation
 
-### Install all five (recommended)
+### Install all six (recommended)
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
@@ -81,6 +82,7 @@ claude plugin install ab-harness@claude-ecosystem-hygiene
 claude plugin install memory-hygiene@claude-ecosystem-hygiene
 claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
 claude plugin install test-effectiveness-auditor@claude-ecosystem-hygiene
+claude plugin install repo-hygiene@claude-ecosystem-hygiene
 ```
 
 ### Install individually via git
@@ -92,6 +94,7 @@ cp -r /tmp/ceh/plugins/ab-harness ~/.claude/skills/
 cp -r /tmp/ceh/plugins/memory-hygiene ~/.claude/skills/
 cp -r /tmp/ceh/plugins/doc-freshness-reverse-lint ~/.claude/skills/
 cp -r /tmp/ceh/plugins/test-effectiveness-auditor ~/.claude/skills/
+cp -r /tmp/ceh/plugins/repo-hygiene ~/.claude/skills/
 ```
 
 > **`doc-freshness-reverse-lint` needs a hook** to trigger automatically. After
@@ -143,10 +146,16 @@ cp -r /tmp/ceh/plugins/test-effectiveness-auditor ~/.claude/skills/
 │    ├─ runs the project test command, parses pass/fail       │
 │    ├─ classifies caught / gap_testable / gap_hard / unrunna │
 │    └─ Method 2: gh actions / gcloud builds CI history       │
+├─────────────────────────────────────────────────────────────┤
+│  repo-hygiene                  Scope: your project's repo   │
+│    ├─ tracked data files (.csv/.db/.parquet) + .gitignore   │
+│    ├─ hardcoded /Users/ paths + runtime artifacts           │
+│    ├─ branch ownership + internal docs vs deliverables      │
+│    └─ client data in public repos — pre-PR / pre-handover   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Run `ecosystem-audit` to see the big picture of your `~/.claude/`. Point `ab-harness` at the HOT artifacts it flagged to see which ones actually change task outcomes. When the harness or the audit flags memory issues, drop into `memory-hygiene` for concrete fixes. Once a new lesson lands, `doc-freshness-reverse-lint` catches any project docs that still recommend the retracted approach — closing the loop so future sessions don't re-learn the wrong thing. Separately, when you want the same "measure don't guess" rigor applied to your project's own automated tests, run `test-effectiveness-auditor` — it replays past bugs at pre-fix commits and tells you which ones the suite would have caught. For skill-authoring tooling (including the subprocess-blindness diagnostic), see [`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring).
+Run `ecosystem-audit` to see the big picture of your `~/.claude/`. Point `ab-harness` at the HOT artifacts it flagged to see which ones actually change task outcomes. When the harness or the audit flags memory issues, drop into `memory-hygiene` for concrete fixes. Once a new lesson lands, `doc-freshness-reverse-lint` catches any project docs that still recommend the retracted approach — closing the loop so future sessions don't re-learn the wrong thing. Separately, when you want the same "measure don't guess" rigor applied to your project's own automated tests, run `test-effectiveness-auditor` — it replays past bugs at pre-fix commits and tells you which ones the suite would have caught. And before each PR or handover, `repo-hygiene` sweeps the project repo for the cleanup mistakes that cost hours later — stray data files, hardcoded paths, and client data in public repos. For skill-authoring tooling (including the subprocess-blindness diagnostic), see [`claude-skill-authoring`](https://github.com/wan-huiyan/claude-skill-authoring).
 
 ## What to do with A/B harness results
 
@@ -212,6 +221,7 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 - **[skill-portfolio-audit](https://github.com/wan-huiyan/skill-portfolio-audit)** — Portfolio-wide README/badge standardization. Run after cleanup to polish remaining skills.
 - **[session-handoff](https://github.com/wan-huiyan/session-handoff)** — Creates the handoff docs that this bundle audits.
 - **[skill-sync](https://github.com/wan-huiyan/skill-sync)** — Keeps published skills in sync with their GitHub repos.
+- **[skill-anonymizer](https://github.com/wan-huiyan/skill-anonymizer)** — Scans skills for client-specific data and anonymizes them for safe public sharing — the skill-level companion to `repo-hygiene`'s repo-level "client data in public repos" check.
 
 ## Quality Checklist
 
@@ -230,6 +240,7 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 
 ## Version History
 
+- **v1.7.0** (2026-05-29) — **Added `repo-hygiene` v1.1.0** as the project-quality track's "clean" tool — sibling to `test-effectiveness-auditor` (which measures the same repo's tests). Pre-PR / pre-handover checklist that catches repo-level mistakes that cost hours later: data files committed to git (`.csv`/`.db`/`.parquet`), hardcoded `/Users/` paths, tracked runtime artifacts, branch-ownership confusion, internal docs drifting from deliverables, and **client data in public repos**. Bundle now 6 plugins (Claude-ecosystem track 4 + project-quality track 2). README "two tracks" framing, What's-Inside table, fit-together diagram, and install commands updated. Also added a `skill-anonymizer` cross-link (the skill-level companion to `repo-hygiene`'s repo-level client-data check).
 - **v1.6.0** (2026-04-25) — **ecosystem-audit bumped to v1.2.0** with two changes motivated by v3 layered-ablation findings (240 cells, n=15). **Change A:** T1 tier now requires A/B evidence (`ab_evidence.delta_vs_noop_se >= 1.0`) or an explicit `reference-count-only` disclaimer — "frequently referenced" no longer equals T1, following the v3 finding that `lessons.md` (highest-ref layer) had Δ within noise while `skills+plugins` (C4) dominated. `score_health.py` emits `t1_warnings` for undocumented T1 layers. **Change B:** each skill-type layer now carries `latency_cost` and `trigger_surface_match` annotations; new report section "Skills with mismatched trigger surface" lists high-ref / low-A/B-signal skills (the v3 pattern that adds latency without pitfall benefit). Recommendation engine updated to mine session prompts for task-type distribution before suggesting skills. Plugin adds `README.md`, `CHANGELOG.md`, and standalone `marketplace.json`. Two new evals (IDs 8–9) covering T1 warning and mismatch explanations. Cross-references ab-harness v1.2.0 §"Noise floor" and §"C11 saturation."
 - **v1.5.0** (2026-04-24) — **Added `test-effectiveness-auditor` v1.0.0** as the project-quality measurement track. Sibling 'measure' tool to `ab-harness`: ab-harness measures whether your Claude Code stack improves outcomes, this measures whether your project's own automated tests catch bugs. Mines `docs/findings|issues|diagnostics|audits` + git log fix commits, replays each incident at pre-fix SHA in a temp worktree, runs the project test command, classifies caught / gap_testable / gap_hard / unrunnable. Method 2 secondary: classify CI history (gh actions / gcloud builds). Bundled from [`wan-huiyan/test-effectiveness-auditor`](https://github.com/wan-huiyan/test-effectiveness-auditor) via `sync-test-effectiveness-auditor.yml` (cron Mon 09:05 UTC, repository_dispatch on `test-effectiveness-auditor-updated`). README updated to call out the new "two tracks" framing — Claude-ecosystem track (4 plugins) and project-quality track (1 plugin).
 - **v1.4.0** (2026-04-24) — **Naming cleanup.** Marketplace renamed `wan-huiyan-ecosystem-hygiene` → `claude-ecosystem-hygiene` (matches repo). Plugin `claude-code-ab-harness` → `ab-harness` (dropped redundant `claude-code-` prefix; now parallel with the other three plugin names). Real-name references (`Huiyan Wan`) replaced with the `wan-huiyan` GitHub handle across marketplace/plugin manifests and one SKILL.md frontmatter. **Breaking:** existing installs referring to `@wan-huiyan-ecosystem-hygiene` or `claude-code-ab-harness@...` will need to be reinstalled with the new names. `ab-harness` plugin bumped to v1.2.0 to signal the rename.
