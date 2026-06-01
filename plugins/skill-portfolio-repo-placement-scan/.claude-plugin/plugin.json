@@ -1,0 +1,17 @@
+{
+  "name": "skill-portfolio-repo-placement-scan",
+  "description": "Scan a portfolio of authored Claude Code skills and produce, per target repo, a precise list of which skills to ADD, which to UPDATE (with drift direction), and which to CROSS-LINK rather than copy. Uses per-repo function-level inclusion bars, portfolio deduplication (never recommend a skill already homed elsewhere), and a version/last_verified divergence check. Run before skill-portfolio-audit: placement first (where does it live?), then quality.",
+  "version": "1.0.0",
+  "author": { "name": "wan-huiyan", "url": "https://github.com/wan-huiyan" },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "skill-portfolio",
+    "placement",
+    "deduplication",
+    "marketplace",
+    "ecosystem-hygiene"
+  ]
+}
