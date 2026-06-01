@@ -1,7 +1,7 @@
 ---
 name: ecosystem-audit
-version: 1.2.0
-updated: 2026-04-25
+version: 1.2.1
+updated: 2026-06-01
 description: >
   ALWAYS use this skill when the user asks any question about their Claude Code setup, installed
   skills, memory system, handoffs, worktrees, or ~/.claude directory health. This is the
@@ -101,7 +101,7 @@ memory-hygiene (v3.0+) is the authoritative spec for the Memory tier. To prevent
 
 1. **Invoke `memory-hygiene` Phase 1 (Discover) only** — do not execute Phase 4 fixes.
 2. **Consume its structured audit report** (the headings under `## Memory Hygiene Audit`) as the input to ecosystem-audit's Memory score.
-3. **Version-pin check:** read memory-hygiene's SKILL.md frontmatter. If the major version differs from what this skill was calibrated against (currently v3.0), fail loudly and ask the user to re-sync ecosystem-audit before scoring.
+3. **Version-pin check:** read memory-hygiene's SKILL.md frontmatter. If the major version differs from what this skill was calibrated against (currently v3.3 — Phase 1 Discover + Phase 1h ADRs/MADR 4.0 interface verified compatible 2026-06-01), fail loudly and ask the user to re-sync ecosystem-audit before scoring.
 
 If for any reason memory-hygiene cannot run (missing, errored, version mismatch), render the Memory axis as `N/A` in the radar chart (see Phase 3) and list blockers. Never fabricate a score.
 
