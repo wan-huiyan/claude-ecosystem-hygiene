@@ -8,8 +8,10 @@ description: |
   public repos. Also use when the user says "clean up the repo", "is this ready to merge?",
   "prepare for handover", "before we push", "repo hygiene", or when you notice tracked .csv,
   .db, .parquet, or /Users/ paths during any file operation. Especially important for repos
-  with multiple contributors working on parallel branches.
-version: 1.1.0
+  with multiple contributors working on parallel branches. Also covers reviewing/auditing
+  a published plugin/skill repo: probe live CI + run the repo's own tests before eyeballing
+  files ("review if this repo needs updating", "is this repo up to date?", "audit my plugin repo").
+version: 1.2.0
 ---
 
 # Repo Hygiene
@@ -274,6 +276,38 @@ git branch --show-current
 
 **The exception:** Solo repos where you are the only contributor. Even then, branches
 help if you use squash-merge for clean history.
+
+### 10. Reviewing/Auditing a Repo: Probe CI + Run Tests First, Don't Eyeball Files
+
+**The problem:** When asked to "review if this repo needs updating", "check if it's up to
+date", or "audit my plugin/skill repo", the instinct is to read the file tree. But a
+green-looking tree can hide a repo whose latest push shipped **red CI** and stayed red
+unnoticed. Classic signature: a version-bump commit emits a malformed semver with a
+leading/trailing dot (`.1.9.1` instead of `1.9.1`) from a `sed` bump — visually almost-right,
+invalid semver, fails the repo's own manifest/semver test, breaks plugin-install version parsing.
+
+**Lead with two probes, BEFORE reading content:**
+```bash
+# 1. Live CI status — if the latest default-branch run is `failure`, that's your headline finding.
+gh run list --repo <owner>/<repo> --limit 5
+
+# 2. Clone and run the repo's own test suite — it encodes the invariants eyeballing can't catch.
+gh repo clone <owner>/<repo> /tmp/review -- --depth 1
+cd /tmp/review && npm test        # or: pytest, node --test tests/*.test.mjs, etc.
+```
+Only **then** read content for staleness (changelog gaps, cross-file version skew, stale
+dependency-version references like "memory-hygiene v3.1" while everything else says v3.3).
+
+**The malformed-semver check specifically:**
+```bash
+grep -RhoE '"version":\s*"[^"]*"' <repo> | sort -u
+# any value not matching ^[0-9]+\.[0-9]+\.[0-9]+ is a bug; also compare SKILL.md frontmatter `version:`
+```
+
+**Close the loop:** after pushing a fix, re-run the suite locally (confirm 0 fail) AND poll the
+new CI run (`gh run list --limit 1`) until `completed/success` — the step the original push skipped.
+Root-cause the *process*, not just the typo: red shipped and stayed red means nobody gates publish
+on green CI (see the `claude-plugin-repo-ci-release` plugin, which installs exactly that gate).
 
 ## Common Mistakes by Project Type
 

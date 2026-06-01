@@ -1,0 +1,17 @@
+{
+  "name": "claude-plugin-repo-ci-release",
+  "description": "Wire up CI validation and automatic release-cutting for a Claude Code plugin or marketplace repo (one with a .claude-plugin/marketplace.json and plugins/*). Adds two GitHub Actions — a structure validator on every PR/push, and a release-on-version-bump job that cuts a GitHub Release whenever VERSION changes — plus the bundled validator script and workflow templates. Use when a plugin repo has no CI or its GitHub Releases have drifted behind the shipped version.",
+  "version": "1.0.0",
+  "author": { "name": "wan-huiyan", "url": "https://github.com/wan-huiyan" },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "plugin-repo",
+    "ci",
+    "github-actions",
+    "release-automation",
+    "ecosystem-hygiene"
+  ]
+}

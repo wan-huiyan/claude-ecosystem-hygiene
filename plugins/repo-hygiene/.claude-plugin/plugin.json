@@ -1,8 +1,11 @@
 {
   "name": "repo-hygiene",
   "description": "Pre-PR checklist and repo cleanup for data-science / analytics projects. Catches mistakes that cost hours later: data files committed to git (.csv/.db/.parquet), hardcoded /Users/ paths, tracked runtime artifacts, branch-ownership confusion, internal docs drifting from deliverables, and client data in public repos. The project-quality track's 'clean' tool — sibling to test-effectiveness-auditor (which measures the same repo's tests). Use before gh pr create, before merging, or at handover.",
-  "version": "1.1.0",
-  "author": { "name": "wan-huiyan", "url": "https://github.com/wan-huiyan" },
+  "version": "1.2.0",
+  "author": {
+    "name": "wan-huiyan",
+    "url": "https://github.com/wan-huiyan"
+  },
   "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
   "license": "MIT",
   "keywords": [
