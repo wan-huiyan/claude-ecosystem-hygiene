@@ -1,6 +1,6 @@
 # Claude Code Ecosystem Hygiene
 
-Eight complementary skills across three tracks. The **Claude-ecosystem track** (4 plugins) audits, measures, cleans, and keeps consistent your `~/.claude/` stack: identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve task outcomes, prune what doesn't pull its weight, and keep project docs in sync with the lessons that supersede them. The **project-quality track** (`test-effectiveness-auditor` + `repo-hygiene`) applies the same "measure don't guess, clean before you ship" discipline to your project itself — measure how many real bugs your test suite actually catches, and clean the repo (stray data files, hardcoded paths, client data) before each PR. The **authoring track** (`skill-portfolio-repo-placement-scan` + `claude-plugin-repo-ci-release`) maintains the skills and plugin repos you publish — decide which repo each authored skill belongs in (ADD / UPDATE-with-direction / CROSS-LINK), and wire CI validation + release-on-version-bump into plugin/marketplace repos so GitHub Releases never drift behind the shipped version.
+Nine complementary skills across three tracks. The **Claude-ecosystem track** (5 plugins) audits, measures, cleans, keeps consistent, and curates the context budget of your `~/.claude/` stack: identify what's HOT vs DORMANT, measure whether the HOT artifacts actually improve task outcomes, prune what doesn't pull its weight, keep project docs in sync with the lessons that supersede them, and trim the runaway skills-catalog token tax (`context-police`) without deleting a skill. The **project-quality track** (`test-effectiveness-auditor` + `repo-hygiene`) applies the same "measure don't guess, clean before you ship" discipline to your project itself — measure how many real bugs your test suite actually catches, and clean the repo (stray data files, hardcoded paths, client data) before each PR. The **authoring track** (`skill-portfolio-repo-placement-scan` + `claude-plugin-repo-ci-release`) maintains the skills and plugin repos you publish — decide which repo each authored skill belongs in (ADD / UPDATE-with-direction / CROSS-LINK), and wire CI validation + release-on-version-bump into plugin/marketplace repos so GitHub Releases never drift behind the shipped version.
 
 [![license](https://img.shields.io/github/license/wan-huiyan/claude-ecosystem-hygiene)](LICENSE)
 [![last commit](https://img.shields.io/github/last-commit/wan-huiyan/claude-ecosystem-hygiene)](https://github.com/wan-huiyan/claude-ecosystem-hygiene/commits)
@@ -29,6 +29,7 @@ Reference counts are a starting point, not a verdict. `ecosystem-audit` catches 
 | Plugin | Stage | What it does |
 |--------|-------|--------------|
 | [`ecosystem-audit`](plugins/ecosystem-audit/) | **Audit** | Full-coverage audit across 9 artifact categories (skills, memory, handoffs, ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real skill invocation data. Produces interactive HTML report with radar chart and prioritized P0/P1/P2 cleanup actions. |
+| [`context-police`](plugins/context-police/) | **Curate (context budget)** | Patrol the token cost of a runaway skills/agents catalog (injected every turn **and into every subagent**, paid `×N` on fan-out). Measure the per-turn / per-subagent overhead, trim it per-project (`skillOverrides`) or globally (`disable-model-invocation: true`) **without deleting a single skill**, and emit an interactive HTML recap of exactly what got hidden and why. Fixes the root cause `ecosystem-audit` surfaces: most catalog bloat is *episodic lessons mis-stored as force-loaded skills* — curate them out by description intent. (The tempting alternative, an on-demand retrieval hook, was tested to ground and **killed** by a base-rate wall: precision-when-firing <0.5% for both keyword *and* embedding gates.) Bundled from [`wan-huiyan/context-police`](https://github.com/wan-huiyan/context-police). |
 | [`ab-harness`](plugins/ab-harness/) | **Measure** | Counterfactual A/B + layered-ablation harness. Runs each task twice (setup-ON vs setup-OFF) or strips one layer at a time from a full baseline, then reports turns, tool calls, cost, and pitfall-keyword hits. **Heavyweight: $10–$80, 30min–3hrs.** Pair with the audit to turn reference-count signals into actual quality measurements. |
 | [`memory-hygiene`](plugins/memory-hygiene/) | **Clean** | Deep audit of the persistent knowledge stack: MEMORY.md bloat (200-line threshold), axioms (Cowan cap of 12), lessons deduplication, ADR integrity (MADR 4.0), tier-placement violations, session compression backlog. Grounded in cognitive science (Cowan 2001) and LLM research (Liu et al. 2024). |
 | [`doc-freshness-reverse-lint`](plugins/doc-freshness-reverse-lint/) | **Stay consistent** | Event-driven PostToolUse hook + weekly cron that catches project `docs/` contradicting the lessons that supersede them. When you add "don't sort by p-value" to `lessons.md`, the hook greps `docs/research/**` for literal matches and surfaces them as candidate stale claims — file:line only, never auto-edits. Conservative guardrails (explicit negation, multi-token phrase, one phrase per rule, silent on zero hits) prevent false positives on qualified content. |
@@ -75,11 +76,12 @@ claude: *triggers memory-hygiene*
 
 ## Installation
 
-### Install all eight (recommended)
+### Install all nine (recommended)
 
 ```bash
 claude plugin marketplace add wan-huiyan/claude-ecosystem-hygiene
 claude plugin install ecosystem-audit@claude-ecosystem-hygiene
+claude plugin install context-police@claude-ecosystem-hygiene
 claude plugin install ab-harness@claude-ecosystem-hygiene
 claude plugin install memory-hygiene@claude-ecosystem-hygiene
 claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
@@ -94,6 +96,7 @@ claude plugin install claude-plugin-repo-ci-release@claude-ecosystem-hygiene
 ```bash
 git clone https://github.com/wan-huiyan/claude-ecosystem-hygiene.git /tmp/ceh
 cp -r /tmp/ceh/plugins/ecosystem-audit ~/.claude/skills/
+cp -r /tmp/ceh/plugins/context-police ~/.claude/skills/
 cp -r /tmp/ceh/plugins/ab-harness ~/.claude/skills/
 cp -r /tmp/ceh/plugins/memory-hygiene ~/.claude/skills/
 cp -r /tmp/ceh/plugins/doc-freshness-reverse-lint ~/.claude/skills/
@@ -110,9 +113,11 @@ cp -r /tmp/ceh/plugins/claude-plugin-repo-ci-release ~/.claude/skills/
 > via the weekly audit script — you just lose the event-driven surfacing.
 
 > **Note:** `memory-hygiene` is also available as a standalone repo at
-> [`wan-huiyan/memory-hygiene`](https://github.com/wan-huiyan/memory-hygiene), and
+> [`wan-huiyan/memory-hygiene`](https://github.com/wan-huiyan/memory-hygiene),
 > `test-effectiveness-auditor` is also available standalone at
-> [`wan-huiyan/test-effectiveness-auditor`](https://github.com/wan-huiyan/test-effectiveness-auditor).
+> [`wan-huiyan/test-effectiveness-auditor`](https://github.com/wan-huiyan/test-effectiveness-auditor),
+> and `context-police` is also available standalone at
+> [`wan-huiyan/context-police`](https://github.com/wan-huiyan/context-police).
 > Installing from either source yields the same skill. Use this bundle if you want them
 > alongside the audit and A/B harness; use the standalone repos if you only want one.
 
@@ -246,6 +251,7 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 
 ## Version History
 
+- **v1.9.0** (2026-06-05) — **Added `context-police` v1.8.0** as the context-budget "curate" tool — the fix for the root cause `ecosystem-audit` surfaces. Measures the skills/agents-catalog token tax (paid every turn + into every subagent, `×N` on fan-out), trims it per-project (`skillOverrides`) or globally (`disable-model-invocation: true`) without deleting any skill, and emits an interactive HTML recap. Ships the actionable flip applier (`scripts/apply_disable_model_invocation.py`) + the genericized retrieval-pilot harness (`scripts/pilot/`) that proved a retrieval hook **cannot** replace force-load — a base-rate wall kills both keyword and embedding gates (precision-when-firing <0.5%). Bundled from the standalone [`wan-huiyan/context-police`](https://github.com/wan-huiyan/context-police) and kept in sync by `.github/workflows/sync-context-police.yml`. Bundle now 9 plugins. README intro, What's-Inside table, and install commands updated.
 - **v1.8.0** (2026-06-01) — **Added the authoring track (2 plugins): `skill-portfolio-repo-placement-scan` v1.0.0 and `claude-plugin-repo-ci-release` v1.0.0.** Placement-scan maps a portfolio of authored skills to target repos (ADD / UPDATE-with-direction / CROSS-LINK) using per-repo function bars + dedup + version-divergence checks; ci-release wires structure-validation + release-on-version-bump GitHub Actions into plugin/marketplace repos. **`repo-hygiene` bumped to v1.2.0** — folded in the repo-review pattern (item 10): probe live CI (`gh run list`) + run the repo's own tests *before* eyeballing files, with the malformed-semver (`.1.9.1`) check. Bundle now 8 plugins across three tracks (Claude-ecosystem 4 + project-quality 2 + authoring 2). README intro, What's-Inside table, and install commands updated.
 - **v1.7.0** (2026-05-29) — **Added `repo-hygiene` v1.1.0** as the project-quality track's "clean" tool — sibling to `test-effectiveness-auditor` (which measures the same repo's tests). Pre-PR / pre-handover checklist that catches repo-level mistakes that cost hours later: data files committed to git (`.csv`/`.db`/`.parquet`), hardcoded `/Users/` paths, tracked runtime artifacts, branch-ownership confusion, internal docs drifting from deliverables, and **client data in public repos**. Bundle now 6 plugins (Claude-ecosystem track 4 + project-quality track 2). README "two tracks" framing, What's-Inside table, fit-together diagram, and install commands updated. Also added a `skill-anonymizer` cross-link (the skill-level companion to `repo-hygiene`'s repo-level client-data check).
 - **v1.6.0** (2026-04-25) — **ecosystem-audit bumped to v1.2.0** with two changes motivated by v3 layered-ablation findings (240 cells, n=15). **Change A:** T1 tier now requires A/B evidence (`ab_evidence.delta_vs_noop_se >= 1.0`) or an explicit `reference-count-only` disclaimer — "frequently referenced" no longer equals T1, following the v3 finding that `lessons.md` (highest-ref layer) had Δ within noise while `skills+plugins` (C4) dominated. `score_health.py` emits `t1_warnings` for undocumented T1 layers. **Change B:** each skill-type layer now carries `latency_cost` and `trigger_surface_match` annotations; new report section "Skills with mismatched trigger surface" lists high-ref / low-A/B-signal skills (the v3 pattern that adds latency without pitfall benefit). Recommendation engine updated to mine session prompts for task-type distribution before suggesting skills. Plugin adds `README.md`, `CHANGELOG.md`, and standalone `marketplace.json`. Two new evals (IDs 8–9) covering T1 warning and mismatch explanations. Cross-references ab-harness v1.2.0 §"Noise floor" and §"C11 saturation."
