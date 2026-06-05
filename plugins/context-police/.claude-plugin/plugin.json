@@ -1,6 +1,6 @@
 {
   "name": "context-police",
-  "description": "Measure, trim, and report the token cost of a runaway Claude Code skills/agents catalog (injected every turn + into every subagent) — verified per-project skillOverrides + global disable-model-invocation levers, an interactive HTML recap, and the durable root-cause fix (curate episodic lessons out of the always-on catalog by description intent; a retrieval-hook replacement was tested to ground and killed by a base-rate wall).",
+  "description": "Measure, trim, and report the token cost of a runaway Claude Code skills/agents catalog (injected every turn + into every subagent) \u2014 verified per-project skillOverrides + global disable-model-invocation levers, an interactive HTML recap, and the durable root-cause fix (curate episodic lessons out of the always-on catalog by description intent; a retrieval-hook replacement was tested to ground and killed by a base-rate wall).",
   "version": "1.8.0",
   "author": {
     "name": "wan-huiyan",
