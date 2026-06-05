@@ -1,0 +1,127 @@
+name: Sync context-police from upstream
+
+# Keeps plugins/context-police/ in sync with the canonical
+# wan-huiyan/context-police repo.
+#
+# NOTE: context-police's upstream layout differs from memory-hygiene's:
+#   - the canonical skill lives NESTED at plugins/context-police/skills/context-police/
+#     (SKILL.md + scripts/), with NO .claude-plugin/ in that skill dir;
+#   - the version lives in the SKILL.md YAML frontmatter (`version: X.Y.Z`), not the H1.
+# So this is a context-police-specific sync (not a copy of sync-memory-hygiene.yml):
+# it points at the nested skill dir and protects the bundle's .claude-plugin/ dir from --delete.
+#
+# Triggers:
+#   - schedule: Monday 09:00 UTC (weekly check)
+#   - workflow_dispatch: manual trigger from GitHub UI or gh CLI
+#   - repository_dispatch: fired by context-police's own push workflow (near-real-time sync, if wired)
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [context-police-updated]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out bundle repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone upstream context-police
+        run: |
+          git clone --depth 1 https://github.com/wan-huiyan/context-police.git /tmp/upstream-cp
+          cd /tmp/upstream-cp
+          echo "UPSTREAM_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Sync plugin contents
+        id: sync
+        run: |
+          set -e
+          BUNDLE_DIR=plugins/context-police
+          # Canonical skill lives NESTED in the upstream marketplace layout.
+          UPSTREAM_PLUGIN=/tmp/upstream-cp/plugins/context-police/skills/context-police
+
+          if [ ! -f "$UPSTREAM_PLUGIN/SKILL.md" ]; then
+            echo "::error::Upstream skill not found at $UPSTREAM_PLUGIN/SKILL.md"
+            exit 1
+          fi
+
+          # Rsync SKILL.md + scripts/ from the nested skill dir into the FLAT bundle plugin dir.
+          # Protect the bundle's .claude-plugin/ dir (it isn't in the source — keeps the bundle's
+          # author/repo/keywords metadata; without this protection --delete would remove it).
+          # Also drop python bytecode caches.
+          rsync -a --delete \
+            --exclude='.claude-plugin/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            "$UPSTREAM_PLUGIN/" "$BUNDLE_DIR/"
+
+          # Extract upstream version from the SKILL.md YAML frontmatter (`version: X.Y.Z`).
+          UPSTREAM_VERSION=$(grep -m1 -E '^version:' "$BUNDLE_DIR/SKILL.md" | sed -E 's/^version:[[:space:]]*//; s/[[:space:]]*$//')
+          if [ -z "$UPSTREAM_VERSION" ]; then
+            echo "::warning::Could not extract version from $BUNDLE_DIR/SKILL.md frontmatter — skipping version sync"
+          else
+            # Normalize to X.Y.Z (plugin.json likes semver)
+            case "$UPSTREAM_VERSION" in
+              *.*.*) SEMVER=$UPSTREAM_VERSION ;;
+              *.*) SEMVER="${UPSTREAM_VERSION}.0" ;;
+              *) SEMVER="${UPSTREAM_VERSION}.0.0" ;;
+            esac
+            echo "semver=$SEMVER" >> $GITHUB_OUTPUT
+
+            python3 - <<PYEOF
+          import json
+          # Update plugin.json
+          p = "$BUNDLE_DIR/.claude-plugin/plugin.json"
+          d = json.load(open(p))
+          d["version"] = "$SEMVER"
+          open(p, "w").write(json.dumps(d, indent=2) + "\n")
+          print(f"✓ plugin.json → {d['version']}")
+
+          # Update marketplace.json
+          m = ".claude-plugin/marketplace.json"
+          md = json.load(open(m))
+          for plugin in md.get("plugins", []):
+              if plugin.get("name") == "context-police":
+                  plugin["version"] = "$SEMVER"
+                  print(f"✓ marketplace.json → context-police {plugin['version']}")
+          open(m, "w").write(json.dumps(md, indent=2) + "\n")
+          PYEOF
+          fi
+
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected:"
+            git diff --stat
+          fi
+
+      - name: Commit and push (if changes)
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/context-police .claude-plugin/marketplace.json
+          UPSTREAM_SHORT=$(echo "${UPSTREAM_SHA}" | cut -c1-7)
+          git commit -m "chore: sync context-police from upstream @ ${UPSTREAM_SHORT}" \
+            -m "Upstream: https://github.com/wan-huiyan/context-police/commit/${UPSTREAM_SHA}" \
+            -m "Version: ${{ steps.sync.outputs.semver }}" \
+            -m "Auto-synced by .github/workflows/sync-context-police.yml"
+          git push
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.sync.outputs.changed }}" = "true" ]; then
+            echo "✅ Synced context-police from upstream @ ${UPSTREAM_SHA}" >> $GITHUB_STEP_SUMMARY
+            echo "Version: ${{ steps.sync.outputs.semver }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✓ Already in sync with upstream @ ${UPSTREAM_SHA}" >> $GITHUB_STEP_SUMMARY
+          fi
