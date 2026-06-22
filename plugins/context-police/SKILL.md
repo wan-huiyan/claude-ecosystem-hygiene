@@ -1,236 +1,212 @@
 ---
 name: context-police
 description: |
-  Use when the installed skills/agents catalog has grown large (hundreds+ standalone ~/.claude/skills/,
-  e.g. from a claudeception/auto-skill-minting loop) and is driving token cost or breaking subagents.
-  Symptoms: (1) the available-skills list is huge and re-appears in context every turn and inside every
-  subagent; (2) a subagent dispatch fails with "Prompt is too long" at 0 tokens; (3) you want to cut the
-  per-turn/per-subagent overhead WITHOUT deleting skills, ideally scoped to one project. Covers the verified
-  fix (`skillOverrides`), the settings-precedence gotcha (project OVERRIDES user, so `enabledPlugins`
-  per-project is the wrong tool), the VERIFIED global lever (`disable-model-invocation: true` drops a skill's
-  NAME from the catalog while keeping it /name-invocable + rg-reachable), how to build a wide per-project
-  denylist SAFELY (anchored startswith not substring; PROTECT allowlist; review-panel because allow-by-default
-  makes false-hides the only harm), how to measure the overhead, how to verify Claude Code mechanics when
-  the `claude-code-guide` agent itself overflows, how to emit an INTERACTIVE HTML recap of the treatment
-  (`scripts/render_treatment_report.py` — a clickable, searchable drill-down of every skill by decision), and
-  the DURABLE root-cause analysis when most of the catalog is claudeception lesson/traps: the per-project
-  `skillOverrides` + global `disable-model-invocation` CURATION is the real, measured bloat win; the
-  "route traps to a two-trigger retrieval hook instead of force-loading" idea was tested to ground and KILLED
-  — keyword AND embedding retrievers both hit the same base-rate wall (precision-when-firing <0.3%; proven, not a
-  tuning gap); the shadow hook is removed. The curation flip WAS executed (S13): 404 traps `disable-model-invocation`d
-  after a 3-rater spot-check rescued 33 mislabeled procedures from a single-rater hide-list.
+  Use when an agent harness's skills/tools catalog has grown large (hundreds+, e.g. from an auto-skill-minting
+  loop) and is taxing context: the listing of skill names+descriptions is injected every turn AND into every
+  subagent, so cost multiplies on fan-out and small-context agents can overflow ("Prompt is too long" at 0
+  tokens). The PROBLEM + curation METHODOLOGY are harness-agnostic — the Agent Skills open standard
+  (agentskills.io) is shared by Claude Code, Cursor, Codex, Copilot CLI, Gemini CLI; only the levers differ.
+  Covers: the portable diagnosis + classification rigor (curate by INTENT not name, conservative asymmetry,
+  blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budget on Claude
+  Code + Codex vs manual curation on Cursor/Copilot CLI/Gemini CLI); the Claude Code levers (`skillOverrides`,
+  `disable-model-invocation`, the native `skillListingBudgetFraction`/`maxSkillDescriptionChars` budget read via
+  `/doctor`, and the anti-pattern of raising the fraction); the `disable-model-invocation` DUAL-ROLE footgun
+  (also the correct setting for a user slash-command — so a "name-invoked → restore" audit is a false-positive
+  machine); plus a history footnote (a retrieval-hook replacement was tested to ground and KILLED by a base-rate
+  wall; the forward hide-sweep is largely played out post-budget).
 author: Claude Code
-version: 1.8.0
-date: 2026-06-05
+version: 2.0.0
+date: 2026-06-17
 ---
 
-# context-police — Skills-Catalog Context Cost + the skillOverrides Fix
+# context-police — skills-catalog context cost in agent harnesses
 
-*(formerly `skills-catalog-context-cost-skilloverrides-scoping`; renamed S10 2026-06-04. It polices the
-context budget: measure the catalog cost, trim it per-project, and report it.)*
+*(formerly `skills-catalog-context-cost-skilloverrides-scoping`. **v2.0.0 reframe:** the problem + method are
+harness-agnostic; the Claude Code levers are ONE implementation. Earlier versions were Claude-Code-only, and a
+big chunk of that work was superseded when harnesses added native budgets — see "History" at the bottom.)*
 
-## Problem
-Claude Code injects the catalog of available skills/agents into context **every turn and into every
-subagent's base context**. A claudeception-style loop that mints a new skill most sessions grows
-`~/.claude/skills/` unboundedly (800+), and every one is force-loaded forever. Two real effects: (a) large
-per-turn and per-subagent token cost (a trivial `general-purpose` subagent was observed carrying ~30k tokens
-of base context for a one-word reply — paid N× across a fan-out run); (b) small-context agent types can
-overflow on launch.
+## The problem (any harness with an always-on skill catalog)
+An agent harness injects the **listing of available skills/tools (names + descriptions) into context every turn,
+and into every sub-agent's base context.** An auto-minting loop (claudeception-style: ~1 new skill/session) grows
+that catalog unboundedly, and every entry is force-loaded forever. Two real effects: (a) per-turn **and
+per-subagent** token cost that multiplies on fan-out (a trivial subagent was observed carrying ~30k tokens of base
+context for a one-word reply); (b) small-context agent types overflow on launch ("Prompt is too long", 0 tokens).
+Skill *bodies* lazy-load on use on every modern harness — it's the always-on **listing** that's the tax.
 
-## Context / Trigger Conditions
-- `~/.claude/skills/` has hundreds of standalone skills; the injected list is huge.
-- A subagent fails immediately with **"Prompt is too long" (0 tokens, 0 tool_uses)** — especially a
-  small-context agent type like `claude-code-guide`.
-- You want to reduce overhead for a focused project but keep all skills installed (and keep heavily-used
-  plugins like a voltagent/agent-review-panel set fully enabled elsewhere).
+## The portable core — this is what travels to ANY harness
+The levers further down are platform-specific; **these ideas are not** — they're information architecture + arithmetic.
 
-## Solution (verified against code.claude.com/docs/en/settings, 2026-06-03)
-1. **Diagnose precisely — don't overstate.** Catalog injection is a real *cost* that multiplies per subagent,
-   but it does NOT universally break launches. Probe empirically: dispatch a one-word-prompt `general-purpose`
-   subagent (works → general subagents have room) vs the failing agent type. If only one type overflows, the
-   cause is **that agent type's smaller context window**, not a universal catalog overflow. State it that way.
-2. **The lever for standalone skills is `skillOverrides`** (NOT `enabledPlugins` — that only governs plugins).
-   `skillOverrides` is a settings.json map keyed by skill name; value `"on" | "name-only" |
-   "user-invocable-only" | "off"`. `"off"` removes the skill from the model-invocable catalog (drops its
-   context cost) without editing/deleting its SKILL.md; `"name-only"` keeps it discoverable but drops the
-   description. Example: `{"alphafold-database":"off","scanpy":"off"}`.
-3. **Scope it per-project — and mind the precedence.** Settings precedence is Managed > CLI > Local >
-   **Project > User**, and same-key project settings **OVERRIDE (replace)** user settings (only *permissions*
-   merge). So:
-   - **`skillOverrides` in the project's `.claude/settings.json` is the right tool** — scope the noise cut to
-     this project; other projects keep their full catalog. Set domain-irrelevant skills to `"off"` (e.g. for a
-     static-SPA project, turn off bio/science DBs + cloud-infra one-offs that can never match the work — zero
-     discoverability loss).
-   - **`enabledPlugins` per-project is the WRONG tool** — replace-semantics means a project-local value
-     disables every plugin you didn't re-list. Keep plugin enable/disable global.
-4. **`enabledPlugins` (global) is still the lever for plugin-provided agents/skills** if you genuinely don't
-   use a plugin anywhere (`{"plugin@marketplace": false}`). Don't disable plugins you actually use elsewhere.
-5. **The VERIFIED global lever is `disable-model-invocation: true`** (SKILL.md frontmatter), NOT `"name-only"`.
-   Empirically (2026-06-04): every skill carrying the flag is ABSENT from the injected catalog (verified 16
-   flagged → all gone; a normal loaded skill lacks it), while the skill stays on disk → still `/name`-invocable
-   and `rg`-reachable (so claudeception's mint-time dedup still finds it). It **drops the name** (reclaims the
-   full per-skill cost) and **strictly dominates physical archive** (global, no per-project replication, no path
-   juggling). Use it to bound the catalog at the source (mint new niche lesson/traps WITH the flag) + a one-time
-   sweep of the existing backlog.
-6. **Two CORRECTIONS to the naive durable plan:**
-   - **`"name-only"` is a NO-OP for standalone skills** — they already inject as bare names (no description in
-     the catalog). Only `"off"` (or `disable-model-invocation`/archive) reclaims their tokens.
-   - **`find-skills`/`search-skill` search EXTERNAL marketplaces only** (`npx skills` / `site:`-scoped web
-     search) — NEITHER reads `~/.claude/skills/` on disk. So they are NOT a local re-discovery path for hidden
-     skills. Local re-surfacing is via claudeception's mint-time `rg` (dedup) + manual `/name` only. Don't sell
-     "archive + find-skills will resurface it" — it won't.
-   - Caveat: the policy of hiding all lesson/trap skills rests on the (docs-derived, **unmeasured**) premise that
-     bare-name auto-recall is already marginal at scale — present it to the user as a tradeoff, not a slam dunk.
+1. **Catalog cost is real and multiplies per sub-agent.** Measure it (appendix recipe), don't hand-wave.
+2. **Most auto-minted "skills" are episodic *lessons*, not skills** — single-incident gotchas
+   (`flask-flash-silently-dropped-…`). A lesson belongs in a *searchable archive surfaced on demand*, not the
+   always-loaded catalog. The bloat is a knowledge base in the wrong substrate.
+3. **Curate by description INTENT, never name shape.** Warning-shaped names are often real traps; command-shaped
+   "lessons" exist. A hyphen-count heuristic mislabeled 171/886 skills. The discriminator: *does the agent go
+   LOOKING for it BY NAME (procedure → keep) or does it only help if SURFACED REACTIVELY to warn of a specific
+   mistake (trap → curation candidate)?*
+4. **Conservative, asymmetric bias.** Hiding a real procedure (or restoring a user command) is the *silent, costly*
+   error; failing to hide a trap is harmless (a few unrealized tokens). When in doubt, take the harmless side.
+5. **A "hide from auto-invocation" flag has TWO roles — don't conflate them** (the reverse-audit footgun, below).
+   One is context-saving; the other is the *correct* config for a user slash-command.
+6. **Retrieval can't replace force-load for a dense trap corpus** — proven base-rate wall (History, below).
+   Curation + the agent's own grep-lessons-on-task-start discipline is the lever; an on-demand hook can *assist*,
+   not *replace*.
+7. **Once a harness has a native budget, the forward hide-sweep is largely played out** — it then reclaims only
+   bare names. The durable value shifts to relevance-scoping + reading the diagnostics right + NOT over-hiding.
 
-## Building a WIDE per-project denylist safely (when 211-conservative isn't enough)
-Going past the obvious bio/infra one-offs into the claudeception lesson/trap bulk needs care. It is
-**allow-by-default**, so the ONLY harm is hiding a skill that's actually relevant to *this* project; a missed
-cut is just unrealized savings. Method that worked (211 → ~48% cut):
-1. **Match ANCHORED (`name.startswith(prefix)`), NEVER substring (`prefix in name`).** Substring re-introduces
-   classic traps: `"ml-"` matches `html-...`, `"react"` matches `reactome-database`, `"sql"` matches a relevant
-   skill, etc. (The original conservative generator used `p in n` and got away with it only because its prefixes
-   were long/unique.)
-2. **Add an explicit PROTECT allowlist** (also anchored) for THIS project's real stack — it overrides the
-   denylist. Err toward over-protecting.
-3. **Vet the candidate ADD set with a review panel** (3 diverse-lens reviewers — e.g. app-stack / workflow / a
-   skeptic doing false-positive-confirm + false-negative-scan). Take the **conservative UNION of their PULLs**
-   (keep ON anything ANY reviewer flags). Because false-hide is the only harm, union-not-intersection is correct.
-4. **Final guard:** scan the resulting OFF-set for protect-marker substrings and eyeball the hits (they'll be
-   mostly false substring matches like `gcloud-WORKFLOWs` ≠ CC workflow, `in-memory` matched "memory") — but
-   catch the real one (e.g. `dashboard-redesign-gated-…` named our pending redesign → pull it).
-   Keep `gen_*` + the review JSON + a decision record for provenance and easy revert.
+## Cross-harness landscape (researched 2026-06-17; all adopt the Agent Skills standard, agentskills.io)
+| Harness | Always-on listing? | Native budget / truncation? | Per-skill disable (keep manually-invocable) | Per-subagent ×N? |
+|---|---|---|---|---|
+| **Claude Code** | yes | **YES** — `skillListingBudgetFraction` 1% + `maxSkillDescriptionChars` 1536 (v2.1.105, 2026-04-13); `/doctor` reads it | `skillOverrides` (per-project), `disable-model-invocation` (global) | **yes** (whole catalog into every subagent) |
+| **Codex** | yes (name+desc+path at session start) | **YES** — ~2% / 8000-char cap; descriptions shorten then omit-with-warning; desc cap 1024 | `allow_implicit_invocation:false` / `enabled=false` | **yes** (subagents cost more; recommend a mini child model) |
+| **Cursor 2.4** | descriptions model-visible; `alwaysApply:true` rules inject full body every turn | **no** documented budget (soft "<500 lines" guidance) | **`disable-model-invocation: true`** (→ slash-only) + `paths` glob | subagents exist; ×N unverified |
+| **Copilot CLI** | name+desc index always-on; bodies lazy | **no** | `disable-model-invocation` / `user-invocable:false` + `/skills` toggle | **no** — sub-agents inherit no skills |
+| **Gemini CLI** | yes (name+desc in system prompt at session start) | **no** | `/skills disable` + `@`-invoke | subagents isolated; ×N unverified |
 
-## Optional: emit an interactive recap report (`scripts/render_treatment_report.py`)
-After applying a treatment, render a **self-contained, interactive HTML recap** — useful to show a human what
-got hidden and why, and as a durable, reversible record. It's data-driven (reads the project's
-`.claude/settings.json` + the skills dir), computes the counts + the bare-name token estimate, and produces an
-arcade-styled page whose tiles / before-after bars / panel boxes are **clickable → a searchable, filterable
-explorer of every skill by decision** (off / on / — if you pass a decisions file — kept / added / override, each
-with the reviewer's reason). All data is inlined, so it opens straight from `file://` (no server, no build).
+**Read-out: the problem is universal; the native fix is not.** Claude Code and Codex bound it automatically.
+**Cursor, Copilot CLI, and Gemini CLI have no documented listing budget — there, context-police's manual curation
+is still the live answer.** The `disable-model-invocation` flag is part of the open standard, so it works
+**verbatim on Cursor and Copilot CLI**, not only Claude Code (Cursor's docs even describe it as "behave like a
+traditional slash command" — independent confirmation of the dual-role below). Copilot CLI is the mildest: it also
+avoids the ×N fan-out because sub-agents inherit no skills. *(Items marked "unverified" weren't in the harness's
+public docs as of the research date — confirm before relying.)*
 
+## Claude Code implementation (the specific levers)
+1. **Diagnose precisely.** Catalog injection is a real *cost* that multiplies per subagent, but it does NOT
+   universally break launches. If only one agent type overflows ("Prompt is too long", 0 tokens — e.g.
+   `claude-code-guide`), the cause is **that agent type's smaller context window**, not a universal overflow.
+2. **`skillOverrides`** (settings.json map keyed by skill name; `"on" | "name-only" | "user-invocable-only" |
+   "off"`) is the lever for standalone skills. `"off"` removes a skill from the model-invocable catalog without
+   editing its SKILL.md. Requires CC **v2.1.129+**, does **not** apply to plugin skills (manage those via
+   `/plugin` / `enabledPlugins`), and the **`/skills` menu writes to `.claude/settings.local.json`** (Local >
+   Project) — so menu entries layer OVER hand-authored `.claude/settings.json`; reconcile across both.
+3. **Scope per-project, mind precedence.** Precedence is Managed > CLI > Local > **Project > User**, and same-key
+   project settings **OVERRIDE (replace)** user settings (only *permissions* merge). So `skillOverrides` in the
+   project's `.claude/settings.json` is the right tool for **relevance** trims (bio/infra one-offs irrelevant to
+   *this* repo). **`enabledPlugins` per-project is the WRONG tool** — replace-semantics disables every plugin you
+   didn't re-list; keep plugin enable/disable global.
+4. **`disable-model-invocation: true`** (SKILL.md frontmatter) is the **global** lever for episodic TRAPS: drops
+   the skill from the injected catalog while it stays on disk → still `/name`-invocable + `rg`-reachable. Use it
+   to bound the catalog at the source (mint niche traps WITH the flag) + a one-time backlog sweep.
+5. **The native budget (v2.1.105+, 2026-04-13), read via `/doctor`:**
+   - **`skillListingBudgetFraction`** (default `0.01` = 1%): when the listing exceeds 1% of context, the
+     **least-used** skills' descriptions collapse to bare names (still `/name`- and model-invocable; the model just
+     can't see *why*). Usage-ranked auto-curation, every session.
+   - **`maxSkillDescriptionChars`** (default `1536`): per-skill cap on `description`+`when_to_use`; longer is
+     **truncated** (independent of the budget). Keep your OWN skills' descriptions ≤1536.
+   - `/doctor`'s **Skills ⚠** check prints `N descriptions will be dropped (X%/1% of context)`, the per-entry-cap
+     offenders, and the token cost of opting in. It is the canonical readout — re-run it after any change.
+   - **THE ANTI-PATTERN: do NOT raise `skillListingBudgetFraction` to silence `/doctor`.** The 1% default *is*
+     context-police running natively. Opting in to full descriptions costs ~111k tokens/session (same ballpark as
+     the old ~122k whole-catalog estimate) and burns rate limits faster. The aligned move is the opposite — shrink
+     the catalog (per-project `"off"` + the curated trap flips). `/doctor`'s drop-count is what REMAINS *after*
+     those levers fired; the budget silently absorbs the rest, so the warning is mostly informational.
+   - **`"name-only"` reclaims tokens only for a skill the budget still shows WITH a description** (a *most-used*
+     one); least-used skills are already bare names, so for them it's a no-op — only `"off"`/`disable-model-invocation`
+     reclaims the *name*. (`find-skills`/`search-skill` search EXTERNAL marketplaces only — they do NOT re-surface
+     hidden local skills.)
+
+## Porting to another harness (the recipe)
+Find the harness's three knobs, then apply the portable core:
+1. **Native budget?** Check its own diagnostics (`/doctor`, `/context`, `/skills`). Has one (Claude Code/Codex) →
+   mostly relax, just don't defeat it. None (Cursor/Copilot/Gemini) → manual curation is the job.
+2. **Per-skill visibility control?** `disable-model-invocation` (Claude Code/Cursor/Copilot), `allow_implicit_invocation:false`/`enabled=false` (Codex), `/skills disable` (Gemini). Use it for episodic traps; **KEEP it on user
+   slash-commands.**
+3. **Does cost multiply per sub-agent?** Yes (Claude Code/Codex) → the prize is ×N. No (Copilot) → less urgent.
+Then run the classification rigor below before any bulk change.
+
+## The `disable-model-invocation` DUAL-ROLE footgun (+ the reverse-audit trap)
+The flag does ONE mechanical thing: removes a skill from the **model-invocable** catalog while keeping it
+`/name`-invocable by the user. But that serves TWO different intents, and conflating them causes a destructive
+false-positive:
+1. **Context-saving (the trap sweep):** hide episodic lesson/traps so they don't cost catalog tokens. Reversible.
+2. **The CORRECT config for a USER SLASH-COMMAND** (`changelog`, `setup`, `lfg`, `slfg`, `resolve-pr-parallel`,
+   the `ce-*`/`todo-*` suites): the flag is exactly what STOPS the model from spontaneously auto-firing the command
+   while the user keeps `/name`. For a command the flag is RIGHT — not a "hidden procedure," correct configuration.
+   Built-in commands ship WITH it.
+
+**The reverse-audit trap (measured 2026-06-17):** auditing the already-flipped set for "wrongly-hidden procedures"
+through a *"name-invoked → restore"* lens produces massive FALSE POSITIVES — it flags every user command as a
+mislabeled procedure. Restoring them is actively HARMFUL: it makes the model auto-invoke commands (e.g. the
+autonomous-engineering pipelines `lfg`/`slfg`) AND re-bloats the catalog. A full reverse audit (15 agents, body-reads
+of all 487 hidden) flagged **17** "restore" candidates; on verification **~16 were correctly-configured user
+commands**; genuine restores ≈ **1** (a model-applied design discipline with no command markers). An interim "~7%
+mislabeled" sample estimate was inflated by this same framing error.
+
+**The discriminator (DETERMINISTIC beats another LLM pass):** does the frontmatter carry `argument-hint` /
+`allowed-tools`, or read as "# … Command"? → USER command; the flag is CORRECT; do **not** restore. Only a
+*model-applied* skill (a reusable discipline/procedure the MODEL surfaces, no command markers) is a legit restore
+candidate — confirm with PROVENANCE (`git log -L`/`git blame` the flag line; present at mint = intended, added by a
+sweep = possible victim). **Narrow the "restoring is low-risk" premise:** it holds ONLY for non-command skills;
+restoring a COMMAND is a behavior change (the model can now auto-fire it), not cosmetic.
+
+## Classification rigor for ANY bulk frontmatter sweep (forward OR reverse)
+- Classify by description **INTENT**, never name shape (warning-shaped names are usually real traps; command-shaped
+  "lessons" exist).
+- **Conservative, asymmetric bias:** hiding a procedure (or restoring a command) is the silent, costly error; the
+  opposite is harmless. Take the harmless side on doubt.
+- A deliberately-lenient first pass **over-flags ~15×** (2026-06-17: 16/343 candidates → blind 3-of-3 re-rate
+  confirmed **0**). A BLIND re-rate by independent raters reading the **bodies** (not just descriptions) is mandatory
+  before any destructive change; require strong agreement (2-of-3 min, 3-of-3 for a low-reward case).
+- Prefer a **deterministic** check where one exists (grep `argument-hint`/`allowed-tools`) over an LLM vote.
+
+## Building a WIDE per-project denylist safely (Claude Code; when conservative isn't enough)
+Going past the obvious bio/infra one-offs needs care. It is **allow-by-default**, so the ONLY harm is hiding a skill
+relevant to *this* project; a missed cut is just unrealized savings. Method (≈48% cut):
+1. **Match ANCHORED (`name.startswith(prefix)`), NEVER substring** (`"ml-"` matches `html-…`, `"react"` matches
+   `reactome-database`).
+2. **Add an explicit PROTECT allowlist** (anchored) for this project's stack — overrides the denylist; over-protect.
+3. **Vet the candidate ADD set with a review panel** (3 diverse lenses); take the **conservative UNION of PULLs**
+   (keep ON anything ANY reviewer flags) — false-hide is the only harm, so union-not-intersection is correct.
+4. **Final guard:** scan the OFF-set for protect-marker substrings, eyeball the hits. Keep the generator + review
+   JSON + a decision record for provenance and easy revert.
+
+## Optional: interactive recap report (`scripts/render_treatment_report.py`)
+After a treatment, render a self-contained, interactive HTML recap (reads `.claude/settings.json` + the skills dir,
+computes counts + the bare-name token estimate; clickable tiles → a searchable explorer of every skill by decision).
+Honest-by-construction; opens from `file://`.
 ```bash
 python3 ~/.claude/skills/context-police/scripts/render_treatment_report.py \
-  --settings .claude/settings.json \
-  [--skills-dir ~/.claude/skills] \
-  [--decisions panel-decisions.json] \
-  [--title "My Project"] [--out skill-treatment.html]
+  --settings .claude/settings.json [--skills-dir ~/.claude/skills] \
+  [--decisions panel-decisions.json] [--title "My Project"] [--out skill-treatment.html]
 ```
-- `panel-decisions.json` (optional): `{"pulls":[{"n":"skill","r":"why kept ON"}],"adds":[…],"override":[…]}`.
-  Omit it and the report is just the off/on drill-down; pass it and the panel boxes + reason-annotated views appear.
-- **Verify the render WITHOUT a screenshot** (the Playwright-MCP screenshot subsystem wedges after "fonts loaded"):
-  serve on a fresh port (`python3 -m http.server <port>` in the output dir — `file://` is blocked in the MCP
-  browser), navigate, and use `browser_evaluate` to assert the filter buttons + row counts (skill
-  `playwright-screenshot-timeout-verify-via-evaluate`). On macOS, `open <file.html>` launches it in the user's browser.
-- The numbers are honest-by-construction: token estimate = `Σ(len(name)+3)/4` over the universe (bare names +
-  "- " + newline ≈ 4 chars/token); "saved" = same over the OFF set; paid **every turn + per subagent** → the page
-  notes the `×N` fan-out multiplier. (First built for a reference project — 866→421 off, ~7.5k→~3.1k tok, panel 22/7/1.)
+Verify the render with `browser_evaluate` over a served port (`file://` is blocked in MCP browser; the screenshot
+subsystem wedges) or `open` it on macOS.
 
-## The DURABLE root-cause: lessons-as-skills (two strategies — keep them separate)
-`skillOverrides` is a per-project SYMPTOM fix. The real growth driver is that a claudeception loop mints ~1 skill
-per session and force-loads all of them forever — and most of those are **episodic lesson/traps** (single-incident
-gotchas like `flask-flash-silently-dropped-without-base-render`). Those aren't skills; they're **lessons**, and
-lessons belong in a searchable archive surfaced on demand — **not** the always-loaded catalog. The bloat is a
-knowledge base in the wrong substrate. **Two strategies follow from that — do NOT conflate them:**
-1. **CURATION (the real, measured win): `disable-model-invocation` the episodic traps, keep procedures.** Hide them
-   from the always-on catalog (reclaim tokens) while they stay `/name`-invocable + `rg`-reachable. This pays
-   regardless of any retrieval mechanism. **Triage by intent (below), and decide it on *catalog-cost* grounds.**
-2. **RETRIEVAL-HOOK-AS-REPLACEMENT (tested to ground, SHELVED): surfacing the hidden traps via a context-keyed hook
-   instead of force-load.** Appealing, but a keyword retriever cannot do it (proof below). It can *assist*, not
-   *replace*. Don't sell "the hook makes it safe to hide traps" — that claim is false.
-
-**Fix the trap/procedure classifier FIRST — by DESCRIPTION INTENT, not name shape.** A hyphen-count heuristic
-mislabeled **171/886 skills** (S12): 117 name-invoked PROCEDURES called "trap" (would be wrongly hidden — pure
-recall loss: `auto-review-loop`, a name-invoked feature-evaluator, a recurring conflict-resolution playbook) and 55
-genuine reactive TRAPS called "procedure" (kept force-loaded forever because of name markers like
-`worktree`/`handoff`/`sync`: `git-amend-hits-async-post-commit-hook`, `deploy-from-stale-worktree-silent-rollback`).
-The discriminator: *"does the agent go LOOKING for it BY NAME (procedure → keep force-loaded) or does it only help
-if SURFACED REACTIVELY to warn of a specific mistake (trap → curation candidate)?"* A 36-agent fan-out over the
-frontmatter descriptions is the cheap way to curate ~hundreds (intent labels: 434 trap / 452 procedure here).
-
-**Triage by reusability, not topic:** reusable PROCEDURE (multi-step, trigger generalizes — driven-development,
-worktrees, handoff harnesses) → stays an auto-surfaced skill; single-incident TRAP → routes to the archive.
-
-**The recall worry:** hiding a trap (whether `disable-model-invocation` or `off`) drops its passive name-recognition
-(a trap's trigger situation rarely shares words with its kebab name; the agent can't grep for a trap it doesn't see
-coming). The natural idea — and what S11 built — was a **two-trigger retrieval hook** to surface the hidden traps:
-`UserPromptSubmit` (keys on the prompt) + `PostToolUse` (keys on the tool command / edited file — most traps surface
-mid-session from an action), indexing the `SKILL.md` corpus in place (BM25 v1), injecting top-K as `additionalContext`.
-**S12 measured that this hook cannot do the surfacing job (next block) — so the recall worry is real but the hook is
-NOT the answer; it is a separate, unmeasured cost/benefit call (see the flip-decision note below).**
-
-**⚠️ The retrieval hook can ASSIST but cannot REPLACE force-load — a keyword precision gate does NOT exist for a
-dense trap corpus (S12, proven across FIVE gate families).** A BM25 score floor fires on **~99.6% of ALL turns**
-at any floor (`git status` → 19.4, editing any `.py` → 20.9, "thanks continue" → 9.1 all clear it with *irrelevant*
-traps). S12 then tested the specificity gates S11 hoped would fix it — distinctive-token count, IDF-sum, score
-margin, distinctive-coverage — and **all fail the same way.** The load-bearing reason is a **base-rate wall**, not a
-threshold: genuine-trap moments are **~0.11% of all triggers** (105 / 93,176 in a real corpus), so even a *perfect*
-gate would fire ≤0.11% of the time; every keyword gate fires far more (6.6%–99.6%), making
-**precision-when-firing ≤ 0.31% — ~99.7% noise even at the strictest setting.** (It is NOT that "recall and firing
-fall proportionally" — the strict gate trades *favorably* on ratio; it's that the base rate is below any firing
-rate.) Mechanism: BM25/distinctiveness measures *token overlap with the nearest trap in a 425-trap pool*, not
-*relevance to this context* — only a SEMANTIC signal could, and keyword counting can't represent it. You also can't
-just drop the noisy trigger: `PostToolUse` (per bash/edit) is **both** the main noise source (100% firing, 80% of
-volume) **and** the plurality recall source (39% vs 23% for prompts; a third of recalled traps surface *only* there).
-
-**So: never run it LIVE, NEVER flip on the "the hook makes it safe" basis.** Going live would cry-wolf and habituate
-the model to ignore the banner. **Embeddings — the one untested PRECISION lever — were tested (S13) and FAIL the same
-way.** A semantic cosine gate over `user_prompt` (the path where NL semantics is strongest) reproduces ~23% recall at
-~99% firing and collapses recall faster than firing as you tighten — no threshold clears precision ≥2% with usable
-recall (best realized ≈0.4%). Same base-rate wall, semantic version: it's arithmetic (relevant moments are ~0.1–0.2%
-of triggers), not embedder quality. **The shadow hook is REMOVED** (both `scripts/pilot/hook.py` lines
-deleted from `~/.claude/settings.json`; it was spawning a subprocess per tool call for a dead path). Retrieval as a
-force-load *replacement* for traps is closed; the lever is curation (Strategy 1) + the agent's own
-grep-lessons-on-task-start discipline.
-
-**The flip decision the user owns — EXECUTED (S13).** *"hide the traps via `disable-model-invocation` on catalog-COST
-grounds"* is a cost/benefit call (benefit measured: ~4.9k bare-name → ~122k full-desc tok/injection × every main turn
-+ every subagent + every project; cost unmeasured: passive name-recognition, which force-load wasn't delivering for
-no-signal traps anyway). Presented with numbers; user approved → applied `disable-model-invocation: true` to **404**
-confirmed traps. Don't claim a recall *gain* from hiding them.
-
-**⚠️ A single-rater hide-list MUST be independently re-rated before a destructive sweep — the gate caught real
-mislabels.** The S12 intent labels were single-rater-per-skill. Before flipping, a **blind second-rater (24 agents) +
-a 2-of-3-majority tie-break** over all 434 traps found **33 were actually name-invoked PROCEDURES** (would have been
-wrongly hidden → pure recall loss; several were skills published from the project itself). 91.7% agreement, but the
-42 disagreements skewed 36:6 toward the harmful (trap→procedure) direction — exactly where a mislabel hides a useful
-playbook. Corrected hide-list = 404. **Re-rate before you hide; the dangerous direction is procedure-mislabeled-as-trap.**
-
-**⚠️ Don't blow away an existing relevance-curated `skillOverrides` when you add the global flip — they hide DIFFERENT
-things.** The global frontmatter flag hides TRAPS everywhere (keeps `/name`); a per-project `skillOverrides` "off" map
-is usually a panel-vetted RELEVANCE hide (e.g. bio/research skills irrelevant to *this* repo) that intent labels
-CANNOT reconstruct (labels say trap/procedure, not relevant/irrelevant). Surgical fix when adding the flip:
-`new_off = old_off − (globally-flipped traps) − (proven-useful rescued procedures)` — keep the relevance hides, let
-the global flip own trap-hiding (with `/name`), restore only the spot-check-rescued playbooks.
-
-**Measured (reference project, S10 build → S11 → S12 → S13):** classifier FIXED (intent curation: 434
-trap / 452 procedure; hyphen-count wrong on 171). Keyword retrieval: union recall@5 ≈ 54% **only at ~100% firing**;
-every gate that cuts firing cuts recall below the base-rate wall (precision-when-firing <0.3%). **Embeddings (S13):
-TESTED on `user_prompt`, same wall (best realized precision-when-firing ≈0.4%; reproduces 23% recall at 99% firing).**
-Subagent leg dead (S11: trap-firing 0.9% of 2151 subagents). **Flip EXECUTED (S13): 404 traps `disable-model-invocation`d
-(blind re-rate + tie-break rescued 33 mislabeled procedures first); shadow hook removed; claudeception mint-default
-flipped (new traps mint `disable-model-invocation` by default).** Reference impl + harness: this skill's
-`scripts/pilot/` (phase5/6/7 + `phase8_embeddings_probe.py` + the BM25/recall machinery) and the actionable
-flip applier `scripts/apply_disable_model_invocation.py` (idempotent `--dry-run`/`--apply`/`--revert`). The
-harness reads two corpus-specific inputs (`lesson-index.jsonl`, `intent-labels.json`) it does NOT ship —
-`scripts/pilot/README.md` documents how to regenerate them for your own `~/.claude` and reproduce every number.
-
-## Measuring the overhead (if you want the number)
-The fixed scaffolding re-read each turn ≈ `min(nonzero cache_read_input_tokens across the session's turns)`
-(the stable cached prefix = system prompt + tool/skill catalog + earliest conversation). The naive
-"first-turn cache_write+cache_read = catalog" identity is unreliable (resumed/--continue sessions read a
-pre-warmed cache on turn 1) — calibrate, don't assume. Subagent transcripts
-(`~/.claude/projects/**/subagents/**/agent-*.jsonl`) carry their own per-dispatch floor → that's the N× story.
-
-## Verification
-- After adding project `skillOverrides`, restart Claude Code and confirm the injected skills list shrank.
-- `git check-ignore` / a dry-run generator can quantify how many skills a denylist would turn off before you
-  apply it. Reversible: delete an entry or set `"on"`.
+## Measuring the overhead (Claude Code)
+The fixed scaffolding re-read each turn ≈ `min(nonzero cache_read_input_tokens across the session's turns)` (stable
+cached prefix = system prompt + tool/skill catalog + earliest conversation). The naive "first-turn
+cache_write+cache_read = catalog" identity is unreliable (resumed sessions read a pre-warmed cache) — calibrate.
+Subagent transcripts (`~/.claude/projects/**/subagents/**/agent-*.jsonl`) carry their own per-dispatch floor → the
+N× story. (`/doctor` is the faster path for the listing specifically.)
 
 ## Notes
-- **When `claude-code-guide` overflows, you can't use it to answer Claude Code questions** — verify mechanics
-  by `WebFetch`-ing `code.claude.com/docs/...` directly (note `docs.claude.com/en/docs/claude-code/*` 301-
-  redirects to `code.claude.com/docs/en/*`), or ask from a session where the catalog is already trimmed.
-- Managed-only knobs exist for org control: `strictPluginOnlyCustomization` (block user/project skills),
-  `blockedMarketplaces`, `strictKnownMarketplaces` — not needed for a personal per-project trim.
-- See also: `concurrent-session-curating-shared-global-dir` (the shared skills dir grows live across sessions),
-  `claude-code-subagent-agenttype-overrides-session-model` (a different subagent-context gotcha).
+- **When `claude-code-guide` overflows, you can't use it to answer CC questions** — run `/doctor`, or `WebFetch`
+  `code.claude.com/docs/...` (`docs.claude.com/en/docs/claude-code/*` 301-redirects to `code.claude.com/docs/en/*`).
+- Managed-only org knobs: `strictPluginOnlyCustomization`, `blockedMarketplaces`, `strictKnownMarketplaces`.
+- See also: `concurrent-session-curating-shared-global-dir`, `claude-code-subagent-agenttype-overrides-session-model`.
+
+## History — superseded scaffolding (kept for provenance)
+The S6–S13 arc, much of it now overtaken by native budgets:
+- **The native budget arrived first.** CC's `skillListingBudgetFraction` shipped **v2.1.105 (2026-04-13)** — ~7
+  weeks *before* this skill was first written. The original "docs-derived, not measured ~1% budget" note was about
+  this exact mechanism; it is now verified via `/doctor`. This is why the v1.x headline value (measure + trim the
+  description cost) is mostly the platform's job today.
+- **The retrieval-hook replacement was tested to ground and KILLED.** The idea: surface hidden traps via a
+  two-trigger hook (`UserPromptSubmit` + `PostToolUse`) instead of force-loading. It can't: a keyword score floor
+  fires on **~99.6% of all turns**; every specificity gate (distinctive-token, IDF-sum, score-margin, coverage)
+  fails the same way — a **base-rate wall**: genuine-trap moments are **~0.11% of all triggers** (105/93,176), so
+  precision-when-firing is **≤0.31%** even at the strictest setting. **Embeddings fail identically** (~23% recall
+  at ~99% firing; best realized precision ≈0.4%) — it's arithmetic, not embedder quality. The shadow hook was
+  removed. Retrieval *assists*, it does not *replace* force-load.
+- **The curation flip was executed (S13):** 404 traps `disable-model-invocation`d after a blind 2-of-3 re-rate
+  rescued 33 mislabeled procedures (the dangerous direction is procedure-mislabeled-as-trap); claudeception's
+  mint-default flipped to mint new traps hidden. A **2026-06-17** conservative re-rated extension over ~343 unflagged
+  candidates confirmed **0 new safe traps** → the forward sweep is played out (it now reclaims only ~2–3k bare-name
+  tokens). Don't claim a recall *gain* from hiding traps; the benefit is catalog-cost, the cost (passive
+  name-recognition) was never delivered for no-signal traps anyway.
+- **Don't clobber a relevance-curated `skillOverrides` when adding the global flip** — they hide DIFFERENT things
+  (relevance per-project vs traps everywhere). Surgical: `new_off = old_off − globally-flipped-traps − rescued-procedures`.
+- Reference impl: `scripts/pilot/` (BM25/recall + `phase8_embeddings_probe.py`), `scripts/apply_disable_model_invocation.py`
+  (idempotent `--dry-run`/`--apply`/`--revert`), `scripts/render_treatment_report.py`. Corpus inputs
+  (`lesson-index.jsonl`, `intent-labels.json`) regenerate per `scripts/pilot/README.md`.
