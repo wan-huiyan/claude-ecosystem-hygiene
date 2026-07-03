@@ -226,13 +226,25 @@ Thresholds in *italic* are practitioner heuristics — adjust for your domain.
 - **HTML template styling is opinionated.** The dark terminal theme (GitHub-dark background, Fira Code headings, teal accent) is intentional. Rewrite the template if you want a different aesthetic.
 - **Not a replacement for `schliff:doctor` or individual skill tooling.** This bundle covers ecosystem-level breadth. For per-skill structural quality, pair with [schliff](https://github.com/Zandereins/schliff).
 
-## Related Skills
+## Related Skills & Sibling Repos
+
+Two siblings are load-bearing, not just adjacent:
+
+- **[session-handoff](https://github.com/wan-huiyan/session-handoff)** — The capture end of the pipeline, and a two-way dependency of this bundle. It doesn't just create the handoff docs that `ecosystem-audit` classifies: session-handoff **Phase 4 invokes `doc-freshness-reverse-lint`** at end-of-session (step 24 runs `reverse_lint.py` on every memory file touched; step 24b runs the skill-freshness audit when a SKILL.md was edited), and **`memory-hygiene` v3.3 is the source-of-truth for the 7-bucket `docs/` taxonomy that session-handoff dispatches output into** (§1j) — while memory-hygiene in turn **invokes session-handoff's `label_audit.py`** for label-table integrity (§1i). Both directions degrade gracefully when the other side isn't installed, but you get the full loop only with both.
+- **[token-torch](https://github.com/wan-huiyan/token-torch)** — The measurement node: a local usage/cost dashboard that parses the same session JSONLs and **quantifies whether the hygiene pays off** — per-turn catalog overhead, subagent fan-out cost, cache-read vs fresh-input token split. It already consumes `context-police`'s output, so a curation pass shows up as a measurable before/after drop in the dashboard rather than a vibe.
+
+**Pipeline:** `session-handoff` captures each session's output into the canonical `docs/` taxonomy → `memory-hygiene` prunes the persistent knowledge that accumulates there → `context-police` curates the always-injected skills catalog down to what earns its tokens → `token-torch` measures the impact, closing the loop with numbers.
+
+Adjacent tooling:
 
 - **[schliff](https://github.com/Zandereins/schliff)** — Per-skill structural quality scoring on 7 dimensions. Runs after ecosystem-audit identifies dormant skills to assess if they're worth keeping.
 - **[skill-portfolio-audit](https://github.com/wan-huiyan/skill-portfolio-audit)** — Portfolio-wide README/badge standardization. Run after cleanup to polish remaining skills.
-- **[session-handoff](https://github.com/wan-huiyan/session-handoff)** — Creates the handoff docs that this bundle audits.
 - **[skill-sync](https://github.com/wan-huiyan/skill-sync)** — Keeps published skills in sync with their GitHub repos.
 - **[skill-anonymizer](https://github.com/wan-huiyan/skill-anonymizer)** — Scans skills for client-specific data and anonymizes them for safe public sharing — the skill-level companion to `repo-hygiene`'s repo-level "client data in public repos" check.
+
+### Shared internals contract
+
+Every repo in this family depends on Claude Code internals — transcript JSONL schema, `~/.claude/projects/` layout, the MEMORY.md 200-line/25KB load limit, hook payload contracts, settings precedence, skill-listing budget defaults. These assumptions used to be hardcoded independently in each repo, with different staleness. They now live in one versioned reference: [`contracts/claude-code-internals.md`](contracts/claude-code-internals.md), each entry tagged docs-backed / observed / reverse-engineered with a verified-as-of date and re-verification steps. Run [`contracts/probe_internals.py`](contracts/probe_internals.py) against a live `~/.claude` to get an OK / DRIFT / UNKNOWN report on the locally-checkable subset. When a Claude Code release moves the ground, update the contract first, then propagate to token-torch, context-police, memory-hygiene, session-handoff, and this bundle's plugins.
 
 ## Quality Checklist
 
