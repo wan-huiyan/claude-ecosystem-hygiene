@@ -4,8 +4,11 @@ description: |
   Use when an agent harness's skills/tools catalog has grown large (hundreds+, e.g. from an auto-skill-minting
   loop) and is taxing context: the listing of skill names+descriptions is injected every turn AND into every
   subagent, so cost multiplies on fan-out and small-context agents can overflow ("Prompt is too long" at 0
-  tokens). The PROBLEM + curation METHODOLOGY are harness-agnostic — the Agent Skills open standard
-  (agentskills.io) is shared by Claude Code, Cursor, Codex, Copilot CLI, Gemini CLI; only the levers differ.
+  tokens). This skill is the AUDIT + CURATION methodology plus measurement/reporting: the trimming levers are
+  now native harness features (Claude Code ships them built in) — the durable value is deciding WHAT to trim
+  (episodic lessons vs real skills), applying it safely, and measuring the result. The PROBLEM + curation
+  METHODOLOGY are harness-agnostic — the Agent Skills open standard (agentskills.io) is shared by Claude Code,
+  Cursor, Codex, Copilot CLI, Gemini CLI; only the levers differ.
   Covers: the portable diagnosis + classification rigor (curate by INTENT not name, conservative asymmetry,
   blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budget on Claude
   Code + Codex vs manual curation on Cursor/Copilot CLI/Gemini CLI); the Claude Code levers (`skillOverrides`,
@@ -19,7 +22,7 @@ version: 2.0.0
 date: 2026-06-17
 ---
 
-# context-police — skills-catalog context cost in agent harnesses
+# context-police — skills-catalog audit, curation & measurement in agent harnesses
 
 *(formerly `skills-catalog-context-cost-skilloverrides-scoping`. **v2.0.0 reframe:** the problem + method are
 harness-agnostic; the Claude Code levers are ONE implementation. Earlier versions were Claude-Code-only, and a
@@ -57,7 +60,7 @@ The levers further down are platform-specific; **these ideas are not** — they'
 ## Cross-harness landscape (researched 2026-06-17; all adopt the Agent Skills standard, agentskills.io)
 | Harness | Always-on listing? | Native budget / truncation? | Per-skill disable (keep manually-invocable) | Per-subagent ×N? |
 |---|---|---|---|---|
-| **Claude Code** | yes | **YES** — `skillListingBudgetFraction` 1% + `maxSkillDescriptionChars` 1536 (v2.1.105, 2026-04-13); `/doctor` reads it | `skillOverrides` (per-project), `disable-model-invocation` (global) | **yes** (whole catalog into every subagent) |
+| **Claude Code** | yes | **YES** — `skillListingBudgetFraction` 1% + `maxSkillDescriptionChars` 1536 (shipped v2.1.105, 2026-04-13; defaults as of then — `/doctor` shows your install's live values) | `skillOverrides` (per-project), `disable-model-invocation` (global) | **yes** (whole catalog into every subagent) |
 | **Codex** | yes (name+desc+path at session start) | **YES** — ~2% / 8000-char cap; descriptions shorten then omit-with-warning; desc cap 1024 | `allow_implicit_invocation:false` / `enabled=false` | **yes** (subagents cost more; recommend a mini child model) |
 | **Cursor 2.4** | descriptions model-visible; `alwaysApply:true` rules inject full body every turn | **no** documented budget (soft "<500 lines" guidance) | **`disable-model-invocation: true`** (→ slash-only) + `paths` glob | subagents exist; ×N unverified |
 | **Copilot CLI** | name+desc index always-on; bodies lazy | **no** | `disable-model-invocation` / `user-invocable:false` + `/skills` toggle | **no** — sub-agents inherit no skills |
@@ -77,7 +80,8 @@ public docs as of the research date — confirm before relying.)*
    `claude-code-guide`), the cause is **that agent type's smaller context window**, not a universal overflow.
 2. **`skillOverrides`** (settings.json map keyed by skill name; `"on" | "name-only" | "user-invocable-only" |
    "off"`) is the lever for standalone skills. `"off"` removes a skill from the model-invocable catalog without
-   editing its SKILL.md. Requires CC **v2.1.129+**, does **not** apply to plugin skills (manage those via
+   editing its SKILL.md. Shipped in CC **v2.1.129** (as of writing — verify against your install; older
+   versions silently ignore the key), does **not** apply to plugin skills (manage those via
    `/plugin` / `enabledPlugins`), and the **`/skills` menu writes to `.claude/settings.local.json`** (Local >
    Project) — so menu entries layer OVER hand-authored `.claude/settings.json`; reconcile across both.
 3. **Scope per-project, mind precedence.** Precedence is Managed > CLI > Local > **Project > User**, and same-key
@@ -88,7 +92,8 @@ public docs as of the research date — confirm before relying.)*
 4. **`disable-model-invocation: true`** (SKILL.md frontmatter) is the **global** lever for episodic TRAPS: drops
    the skill from the injected catalog while it stays on disk → still `/name`-invocable + `rg`-reachable. Use it
    to bound the catalog at the source (mint niche traps WITH the flag) + a one-time backlog sweep.
-5. **The native budget (v2.1.105+, 2026-04-13), read via `/doctor`:**
+5. **The native budget (shipped v2.1.105, 2026-04-13 — version + defaults below are as of that release;
+   verify against your install with `/doctor`):**
    - **`skillListingBudgetFraction`** (default `0.01` = 1%): when the listing exceeds 1% of context, the
      **least-used** skills' descriptions collapse to bare names (still `/name`- and model-invocable; the model just
      can't see *why*). Usage-ranked auto-curation, every session.
