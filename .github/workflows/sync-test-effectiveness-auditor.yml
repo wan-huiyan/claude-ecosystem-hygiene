@@ -94,6 +94,39 @@ jobs:
             git diff --stat
           fi
 
+      # ----------------------------------------------------------------------
+      # Fail-closed pre-push gate.
+      #
+      # This job pushes STRAIGHT TO MAIN, so the identical gate in ci.yml
+      # (on: push: branches: [main]) can only ever run AFTER a bad bundle has
+      # already landed. That converts a silent regression into a loud one; it
+      # does not prevent it. Running the check HERE, before `git push`, is what
+      # actually blocks it.
+      #
+      # Deliberately the same command as the ci.yml step and over the same
+      # scope (`.`), so "this pushed" implies "ci.yml's gate will pass".
+      # Exit 1 = at least one skill over cap -> this step fails -> the push
+      # step below never runs -> main is left untouched.
+      # ----------------------------------------------------------------------
+      - name: Gate synced descriptions against the skill-listing cap (pre-push)
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          if ! python3 .github/scripts/check_skill_descriptions.py . --triggers; then
+            {
+              echo "### ❌ Sync blocked — description over the skill-listing cap"
+              echo ""
+              echo "Syncing upstream test-effectiveness-auditor @ \`${UPSTREAM_SHA}\` would put a"
+              echo "SKILL.md description over the per-skill cap, where the harness"
+              echo "silently truncates it mid-sentence."
+              echo ""
+              echo "**Nothing was pushed. main is unchanged.**"
+              echo ""
+              echo "Fix the description upstream, then re-run this workflow."
+            } >> $GITHUB_STEP_SUMMARY
+            echo "::error::Sync blocked: upstream test-effectiveness-auditor would push a SKILL.md description over the skill-listing cap. Nothing pushed, main unchanged. Fix upstream, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Commit and push (if changes)
         if: steps.sync.outputs.changed == 'true'
         run: |
