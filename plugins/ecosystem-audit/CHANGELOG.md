@@ -1,5 +1,51 @@
 # Changelog — ecosystem-audit
 
+## v1.2.2 — 2026-08-04
+
+### Fix: description was over the skill-listing cap since v1.0.0 (158 chars invisible)
+
+**Problem.** Claude Code caps each model-invocable skill's listing entry at
+`skillListingMaxDescChars` (default 1536, read from the v2.1.221 binary) and truncates by
+keeping `full[:1535]` plus an ellipsis — no intelligent summarisation, no warning. This
+skill's description has been **1694 chars since the very first commit** (`bd256ab`,
+2026-04-17, "feat: initial marketplace release with 3 plugins"), so the last **158 chars were
+never once seen by the model**. What was silently dead:
+
+- `…cross-category coverage that neither provides alone.`
+- **`Use this proactively whenever the user describes ANY ecosystem-level symptom, even if they
+  don't explicitly ask for an "audit".`** — the entire proactive-invocation instruction, which
+  is the single sentence most responsible for the skill firing without being named.
+
+**Fix.** Retrimmed to **1485 chars (51 under cap)**. Trigger vocabulary was preserved and
+extended; only prose and implementation detail were cut.
+
+- Kept every quoted trigger phrase except `"what needs cleanup"` (a synonym of the retained
+  `"clean up my ecosystem"` / `"audit my setup"`).
+- Added trigger surface that eval prompts relied on but the description lacked: `lessons`,
+  `feedbacks`, `ADRs` in the opening scope line, `"give me a cleanup script"`, and
+  `"regenerate my stale audit"`.
+- Cut prose: `dark-themed`, `6 categories`, `health percentages`, `ready-to-run`, and the long
+  `complements schliff:doctor … memory-hygiene …` positioning sentence (compressed to
+  "adding runtime usage analytics that per-skill quality checkers lack"; the full comparison
+  still lives in the skill body and README).
+- The proactive-invocation sentence now fits and is live for the first time.
+
+**Measured against `evals/trigger_eval.json`** (10 positive / 10 negative prompts), word-overlap
+coverage. Baseline is `old_description[:1535]` — what the model actually read, not the full
+source:
+
+| metric | before (truncated) | after | Δ |
+|---|---|---|---|
+| positive mean coverage | 0.4291 | 0.4525 | **+0.0233** |
+| negative mean coverage | 0.2104 | 0.1937 | **−0.0167** |
+| separation (pos − neg) | 0.2187 | 0.2588 | **+0.0400** |
+
+Per-prompt: **4 better / 6 same / 0 worse** on positives. The largest negative-side drop is the
+`"run schliff:doctor on my installed skills"` prompt (0.667 → 0.500) — dropping the
+`schliff:doctor` name-drop removes a false-firing pull.
+
+No behavioural change to the audit itself; body, scripts, and report template are untouched.
+
 ## v1.2.0 — 2026-04-25
 
 ### Change A: A/B-evidence-backed T1 promotion

@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "ecosystem-audit",
   "description": "Full-coverage Claude Code ecosystem audit: skills usage from JSONL session logs, memory hygiene, handoff lifecycle, ADR integrity, worktree lifecycle scoring, and automation health. Produces an interactive HTML report with radar chart.",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "author": {
     "name": "wan-huiyan",
     "url": "https://github.com/wan-huiyan"

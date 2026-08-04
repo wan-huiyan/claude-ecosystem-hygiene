@@ -12,3 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate marketplace + plugin structure
         run: python3 .github/scripts/validate_plugins.py
+      - name: Gate SKILL.md descriptions against the skill-listing cap
+        # Over 1536 chars the harness keeps full[:1535] + an ellipsis, so every
+        # trigger phrase past the cut is silently dead. Exit 1 = at least one
+        # skill over cap. --triggers prints the phrases truncation destroys.
+        run: python3 .github/scripts/check_skill_descriptions.py . --triggers

@@ -5,18 +5,17 @@ description: |
   loop) and is taxing context: the listing of skill names+descriptions is injected every turn AND into every
   subagent, so cost multiplies on fan-out and small-context agents can overflow ("Prompt is too long" at 0
   tokens). This skill is the AUDIT + CURATION methodology plus measurement/reporting: the trimming levers are
-  now native harness features (Claude Code ships them built in) — the durable value is deciding WHAT to trim
-  (episodic lessons vs real skills), applying it safely, and measuring the result. The PROBLEM + curation
-  METHODOLOGY are harness-agnostic — the Agent Skills open standard (agentskills.io) is shared by Claude Code,
-  Cursor, Codex, Copilot CLI, Gemini CLI; only the levers differ.
+  now native harness features — the durable value is deciding WHAT to trim (episodic lessons vs real skills),
+  applying it safely, and measuring the result. The PROBLEM + METHODOLOGY are harness-agnostic — the Agent
+  Skills standard (agentskills.io) is shared by Claude Code, Cursor, Codex, Copilot CLI, Gemini CLI; only the
+  levers differ.
   Covers: the portable diagnosis + classification rigor (curate by INTENT not name, conservative asymmetry,
-  blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budget on Claude
-  Code + Codex vs manual curation on Cursor/Copilot CLI/Gemini CLI); the Claude Code levers (`skillOverrides`,
-  `disable-model-invocation`, the native `skillListingBudgetFraction`/`maxSkillDescriptionChars` budget read via
-  `/doctor`, and the anti-pattern of raising the fraction); the `disable-model-invocation` DUAL-ROLE footgun
-  (also the correct setting for a user slash-command — so a "name-invoked → restore" audit is a false-positive
-  machine); plus a history footnote (a retrieval-hook replacement was tested to ground and KILLED by a base-rate
-  wall; the forward hide-sweep is largely played out post-budget).
+  blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budgets vs manual
+  curation); the Claude Code levers (`skillOverrides`, `disable-model-invocation`, the native
+  `skillListingBudgetFraction`/`maxSkillDescriptionChars` budget read via `/doctor`, and the anti-pattern of
+  raising the fraction); the `disable-model-invocation` DUAL-ROLE footgun (also the correct setting for a user
+  slash-command — so a "name-invoked → restore" audit is a false-positive machine); plus a history footnote (a
+  retrieval-hook replacement was killed by a base-rate wall).
 author: Claude Code
 version: 2.0.0
 date: 2026-06-17
