@@ -12,7 +12,7 @@ description: |
   Covers: the portable diagnosis + classification rigor (curate by INTENT not name, conservative asymmetry,
   blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budgets vs manual
   curation); the Claude Code levers (`skillOverrides`, `disable-model-invocation`, the native
-  `skillListingBudgetFraction`/`maxSkillDescriptionChars` budget read via `/doctor`, and the anti-pattern of
+  `skillListingBudgetFraction`/`skillListingMaxDescChars` budget read via `/doctor`, and the anti-pattern of
   raising the fraction); the `disable-model-invocation` DUAL-ROLE footgun (also the correct setting for a user
   slash-command — so a "name-invoked → restore" audit is a false-positive machine); plus a history footnote (a
   retrieval-hook replacement was killed by a base-rate wall).
@@ -59,7 +59,7 @@ The levers further down are platform-specific; **these ideas are not** — they'
 ## Cross-harness landscape (researched 2026-06-17; all adopt the Agent Skills standard, agentskills.io)
 | Harness | Always-on listing? | Native budget / truncation? | Per-skill disable (keep manually-invocable) | Per-subagent ×N? |
 |---|---|---|---|---|
-| **Claude Code** | yes | **YES** — `skillListingBudgetFraction` 1% + `maxSkillDescriptionChars` 1536 (shipped v2.1.105, 2026-04-13; defaults as of then — `/doctor` shows your install's live values) | `skillOverrides` (per-project), `disable-model-invocation` (global) | **yes** (whole catalog into every subagent) |
+| **Claude Code** | yes | **YES** — `skillListingBudgetFraction` 1% + `skillListingMaxDescChars` 1536 (shipped v2.1.105, 2026-04-13; defaults as of then — `/doctor` shows your install's live values) | `skillOverrides` (per-project), `disable-model-invocation` (global) | **yes** (whole catalog into every subagent) |
 | **Codex** | yes (name+desc+path at session start) | **YES** — ~2% / 8000-char cap; descriptions shorten then omit-with-warning; desc cap 1024 | `allow_implicit_invocation:false` / `enabled=false` | **yes** (subagents cost more; recommend a mini child model) |
 | **Cursor 2.4** | descriptions model-visible; `alwaysApply:true` rules inject full body every turn | **no** documented budget (soft "<500 lines" guidance) | **`disable-model-invocation: true`** (→ slash-only) + `paths` glob | subagents exist; ×N unverified |
 | **Copilot CLI** | name+desc index always-on; bodies lazy | **no** | `disable-model-invocation` / `user-invocable:false` + `/skills` toggle | **no** — sub-agents inherit no skills |
@@ -96,7 +96,7 @@ public docs as of the research date — confirm before relying.)*
    - **`skillListingBudgetFraction`** (default `0.01` = 1%): when the listing exceeds 1% of context, the
      **least-used** skills' descriptions collapse to bare names (still `/name`- and model-invocable; the model just
      can't see *why*). Usage-ranked auto-curation, every session.
-   - **`maxSkillDescriptionChars`** (default `1536`): per-skill cap on `description`+`when_to_use`; longer is
+   - **`skillListingMaxDescChars`** (default `1536`): per-skill cap on `description`+`when_to_use`; longer is
      **truncated** (independent of the budget). Keep your OWN skills' descriptions ≤1536.
    - `/doctor`'s **Skills ⚠** check prints `N descriptions will be dropped (X%/1% of context)`, the per-entry-cap
      offenders, and the token cost of opting in. It is the canonical readout — re-run it after any change.
