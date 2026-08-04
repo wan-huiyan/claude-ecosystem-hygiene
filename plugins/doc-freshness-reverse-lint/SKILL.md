@@ -5,11 +5,14 @@ description: |
   rule to ~/.claude/lessons.md, ~/.claude/axioms.md, or any
   ~/.claude/projects/<slug>/memory/feedback_*.md. Also audits ~/.claude/skills/
   for skills whose `last_verified` frontmatter has expired or that opt into a
-  freshness contract without declaring one (axiom #21). Trigger when: (1) a
+  freshness contract without declaring one (axiom #21). ALSO detects the
+  retirement case (v1.3.0): a rule that was RETIRED but whose CONDITION survives
+  in the docs as a live-looking branch ("X is retired — but it still applies if
+  you are a Y") after no Y exists. Trigger when: (1) a
   PostToolUse hook fires on Edit|Write to one of those memory files and the diff
-  contains a new negation rule; (2) user asks "are my project docs still consistent
+  contains a new negation rule OR a retirement; (2) user asks "are my project docs still consistent
   with my lessons / feedback?", "any stale advice in docs/?", "run doc freshness audit",
-  "any stale skills?"; (3) weekly cron audit is due. Produces a list of CANDIDATE
+  "any stale skills?", "did retiring that rule leave anything behind?"; (3) weekly cron audit is due. Produces a list of CANDIDATE
   stale claims — file:line refs only. NEVER auto-edits. Conservative by design:
   for prose lint, surfaces only when the new rule has an explicit negation
   (don't / never / avoid / stop) AND a multi-token searchable phrase AND ≥1 grep hit.
@@ -18,8 +21,8 @@ description: |
   the heuristic project-marker scan is opt-in via `--scan-untagged`. If zero hits,
   the skill exits silent.
 author: Claude (for Huiyan, 2026-04-24)
-version: 1.2.0
-date: 2026-05-15
+version: 1.3.0
+date: 2026-08-04
 ---
 
 # Doc Freshness Reverse-Lint
@@ -34,12 +37,55 @@ read them as authoritative and repeat the retracted advice.
 Real example: `the-causal-impact-repo/docs/research/pre_period_length_methodology.md:92,98`
 referenced "sorting by p-value" after the user had already decided that approach was wrong.
 
+**And a second shape the grep above cannot see (added v1.3.0).** A rule is not
+always *contradicted* — sometimes it is **retired**, and the docs that carried it
+keep a **scoped survivor**: *"X is retired — but it still applies if you are a
+Y."* That reads as current guidance, and it is dead the moment no Y exists.
+
+Real example (DoodleRun, 2026-08-04): *"no deploys by agents"* was retired across
+four live briefs, and every retirement kept *"a cloud session still cannot"* as a
+live branch — after cloud sessions had stopped existing. The next reader would
+have paused to work out which kind of session it was instead of just deploying.
+**The retirement was correct; the surviving condition was the defect.** The
+owner caught it by hand, one turn after the retirement shipped.
+
 ## Mechanisms
 
 ### 1. Reverse-lint (primary, event-driven)
 
 Runs when a negation rule is added to a memory file. Extracts the "don't X" phrase,
 greps project docs, lists matches. Does NOT edit.
+
+### 1b. Dead-branch detection (v1.3.0, runs with the reverse-lint)
+
+Same trigger, different question. Where mechanism 1 asks *"does any doc still
+assert the thing you just forbade?"*, this asks **"does any doc still carry the
+CONDITION of a rule you just retired?"**
+
+THREE explicit signals, ANDed — a scoped survivor is often perfectly legitimate,
+and only a human knows whether the branch can still fire:
+
+1. a **retirement trigger** in the memory file (`retired`, `superseded`,
+   `no longer applies`, `is dead`, …);
+2. a **quoted subject** within 160 chars either side of it — retirement prose
+   nearly always quotes the rule it retires (`"..."`, `'...'`, `` `...` ``,
+   `**...**`), and the quote must be ≥ 2 tokens and not a path or filename;
+3. a doc **paragraph** containing that subject with a **surviving-conditional
+   marker after it** (`still cannot`, `only applies`, `unless you`, `except
+   when`, `if you are a`, `remains true for`, …).
+
+Scope is the **paragraph**, not the line, because markdown prose wraps and the
+retirement and its condition routinely sit on different lines of one block.
+
+**Known limit, stated rather than tuned away:** two unrelated sentences sharing
+one paragraph — one mentioning the retired rule, one carrying an unrelated
+conditional — will co-occur and be surfaced. That is why the output is a
+CANDIDATE with the question attached and never an edit. The script cannot know
+whether a branch can still fire; that is precisely the judgment being asked for.
+
+**Not seen-cached**, unlike mechanism 1. A dead branch is a property of the
+DOCS, which keep changing under a rule that was retired once, so re-surfacing
+after a doc edit is correct rather than chatty.
 
 ### 2. Weekly cron audit (safety net)
 
@@ -124,6 +170,11 @@ Exit codes: `0` = ran cleanly (zero or more candidates). Candidate JSON goes to 
 4. **Silent on zero hits.** If no project-doc matches, the script prints nothing and the
    hook emits no systemMessage. Huiyan dislikes chatty skills.
 5. **Never auto-edit.** Output is always file:line references. The human decides what to update.
+6. **Dead-branch detection needs all THREE signals** (retirement trigger +
+   quoted subject + surviving conditional in the same paragraph). A retirement
+   with no quoted subject, or a doc mention with no conditional attached, is
+   silent — the common case of "this doc simply mentions the old rule as
+   history" must not fire.
 
 ## Hook wiring (PostToolUse on Edit|Write)
 
@@ -178,9 +229,23 @@ The audit:
          "content": "Sorting by p-value is acceptable provided..."}
       ]
     }
+  ],
+  "dead_branch_candidates": [
+    {
+      "retired_subject": "no deploys by agents",
+      "question": "'no deploys by agents' is retired — does the condition this paragraph scopes it to still occur? If not, the branch is dead and reads as current guidance.",
+      "matches": [
+        {"file": "docs/runbooks/deploy_thing.md",
+         "line": 3,
+         "content": "\"No deploys by agents\" is retired. A cloud session still cannot: no"}
+      ]
+    }
   ]
 }
 ```
+
+`dead_branch_candidates` is always present and is `[]` when nothing fires — the
+skill stays silent overall only when BOTH lists are empty.
 
 ## Validation
 
@@ -189,6 +254,11 @@ the file `the-causal-impact-repo/docs/research/pre_period_length_methodology.md`
 does NOT contain the literal phrase "sort by p-value" (the user has already rephrased),
 so a rule with that negated phrase must produce zero candidates. This confirms the
 conservative guardrails (no false positives on qualified or rephrased content).
+
+**Dead-branch validation** (`evals/fixtures/project_with_dead_branch/`): a
+runbook retiring *"no deploys by agents"* while keeping *"a cloud session still
+cannot"* MUST be flagged; a sibling doc mentioning the same retired rule with no
+condition attached MUST NOT be. Both assertions run off one fixture pair.
 
 ## What this skill does NOT do
 
