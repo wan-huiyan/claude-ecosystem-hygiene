@@ -42,6 +42,57 @@ HEADING_RE = re.compile(r"^###\s+(\d+)\.\s+(.*?)\s*$")
 # feedback files are single-rule, no ### headings
 FRONTMATTER_RE = re.compile(r"^---\s*$")
 
+# --- dead-branch detection (v1.3.0) -----------------------------------------
+#
+# A SECOND failure mode, and the reverse-lint's original grep cannot see it.
+# When a rule is RETIRED rather than contradicted, the docs that carried it
+# often keep a SCOPED SURVIVOR: "X is retired — but it still applies if you are
+# a Y". That reads as current guidance, and it is dead the moment no Y exists.
+#
+# Seen 2026-08-04: "no deploys by agents" was retired across four live briefs,
+# and each retirement kept "a cloud session still cannot" as a live branch —
+# after cloud sessions had stopped existing. The next reader would have stopped
+# to work out which kind of session it was instead of just deploying. The
+# retirement was correct; the surviving condition was the defect.
+#
+# THREE explicit signals, ANDed, because a scoped survivor is often perfectly
+# legitimate and only a human knows whether the branch can still fire:
+#   1. a retirement trigger in the memory file,
+#   2. a QUOTED subject next to it (retirement prose nearly always quotes the
+#      rule it is retiring), >= 2 tokens,
+#   3. a doc line containing that subject AND a surviving-conditional marker.
+RETIREMENT_TRIGGER = re.compile(
+    r"\b(?:retired|retires|retiring|superseded|supersedes|"
+    r"no longer (?:applies|true|holds|stands|the case)|"
+    r"is dead|are dead|does not apply(?: anymore)?)\b",
+    re.IGNORECASE,
+)
+
+# The quoted rule being retired: "...", '...', `...`, **...** or *...*.
+QUOTED_SUBJECT = re.compile(
+    r"[\"“]([^\"”\n]{4,90})[\"”]"
+    r"|'([^'\n]{4,90})'"
+    r"|`([^`\n]{4,90})`"
+    r"|\*\*([^*\n]{4,90})\*\*"
+)
+
+# "...but it STILL applies IF you are a cloud session."
+SURVIVING_CONDITIONAL = re.compile(
+    r"\b(?:still (?:cannot|can'?t|cannot|applies|apply|applies to|holds|true|stands|"
+    r"the case|is|are|do|does|must|should)"
+    r"|only (?:applies|apply|if|when|for|on)"
+    r"|unless you(?:'re| are)?"
+    r"|except (?:for|when|on|if)"
+    r"|if you(?:'re| are) (?:a|an|in|on|running)"
+    r"|remains? true (?:for|on|of)"
+    r"|continues? to (?:apply|hold)"
+    r"|does not apply to)\b",
+    re.IGNORECASE,
+)
+
+# How far after a retirement trigger to look for the quoted subject.
+QUOTE_WINDOW = 160
+
 # Project-doc roots inside any project
 DOC_SUBDIRS = ("docs/research", "docs/decisions", "docs/findings", "docs/runbooks")
 
@@ -233,6 +284,96 @@ def grep_phrase(files: list[Path], phrase: str) -> list[Match]:
     return hits
 
 
+def extract_retired_subjects(text: str) -> list[str]:
+    """Quoted rules being retired in `text`, cleaned and de-duplicated.
+
+    Looks BOTH ways around the retirement trigger: prose puts the quote before
+    it ("X" is retired) about as often as after (retired: "X").
+    """
+    subjects: list[str] = []
+    for m in RETIREMENT_TRIGGER.finditer(text):
+        window = text[max(0, m.start() - QUOTE_WINDOW): m.end() + QUOTE_WINDOW]
+        for q in QUOTED_SUBJECT.finditer(window):
+            phrase = next(g for g in q.groups() if g is not None)
+            phrase = re.sub(r"\s+", " ", phrase).strip().strip(".,;:—-").lower()
+            # A quoted PATH or a single word is not a rule.
+            if len(phrase.split()) < 2 or "/" in phrase or phrase.endswith(".md"):
+                continue
+            if phrase not in subjects:
+                subjects.append(phrase)
+    return subjects
+
+
+def _paragraphs(lines: list[str]) -> list[tuple[int, str]]:
+    """(1-based start line, joined text) for each blank-line-delimited block."""
+    out, buf, start = [], [], 1
+    for i, line in enumerate(lines, start=1):
+        if line.strip():
+            if not buf:
+                start = i
+            buf.append(line)
+        elif buf:
+            out.append((start, " ".join(buf)))
+            buf = []
+    if buf:
+        out.append((start, " ".join(buf)))
+    return out
+
+
+def find_dead_branches(files: list[Path], subjects: list[str],
+                       exclude_name: str | None = None) -> list[dict]:
+    """Lines that mention a retired rule AND still scope it to a live-looking case.
+
+    Scope is the PARAGRAPH, not the line: markdown prose wraps, so the retirement
+    and its surviving condition are routinely on different lines of one block
+    ("...is RETIRED. It described what a cloud session can do... A cloud session
+    still cannot: no credentials"). Requiring both in one paragraph is the
+    tightest unit that still catches the real shape.
+
+    KNOWN LIMIT, stated rather than tuned away: two unrelated sentences sharing a
+    paragraph — one mentioning the retired rule, one carrying an unrelated
+    conditional — will co-occur and be surfaced. That is why this returns
+    CANDIDATES with the question attached and never edits. The script cannot know
+    whether a branch can still fire; that is the judgment being asked for.
+    """
+    out: list[dict] = []
+    for subject in subjects:
+        needle = subject.lower()
+        matches: list[Match] = []
+        for f in files:
+            if exclude_name and f.name == exclude_name:
+                continue
+            try:
+                lines = f.read_text(errors="replace").splitlines()
+            except Exception:
+                continue
+            for start, para in _paragraphs(lines):
+                low = para.lower()
+                pos = low.find(needle)
+                if pos < 0:
+                    continue
+                # The condition must come AFTER the retirement it scopes.
+                if not SURVIVING_CONDITIONAL.search(para, pos):
+                    continue
+                # Report the line the subject is actually on.
+                hit = start
+                for off, line in enumerate(lines[start - 1:], start=start):
+                    if needle in line.lower():
+                        hit = off
+                        break
+                matches.append(Match(file=str(f), line=hit,
+                                     content=lines[hit - 1].strip()[:200]))
+        if matches:
+            out.append({
+                "retired_subject": subject,
+                "question": (f"'{subject}' is retired — does the condition this "
+                             "paragraph scopes it to still occur? If not, the "
+                             "branch is dead and reads as current guidance."),
+                "matches": [asdict(m) for m in matches],
+            })
+    return out
+
+
 def infer_project_root_from_memory(memory_file: Path) -> Path | None:
     """Map ~/.claude/projects/-Users-<user>-Documents/memory/* → /Users/<user>/Documents."""
     s = str(memory_file)
@@ -316,13 +457,22 @@ def main() -> int:
     # Only persist cache if there were rules to consider (avoid masking issues)
     save_seen(new_seen)
 
+    # v1.3.0 — the retirement case, which the negation grep above cannot see.
+    # Deliberately NOT seen-cached: a dead branch is a property of the DOCS,
+    # which change under a rule that was retired once, so re-surfacing it after
+    # a doc edit is correct rather than chatty.
+    dead_branches = find_dead_branches(
+        files, extract_retired_subjects(mf.read_text(errors="replace")),
+        exclude_name=mf.name)
+
     result = {
         "memory_file": str(mf),
         "project_root": str(project_root),
         "candidates": candidates,
+        "dead_branch_candidates": dead_branches,
     }
 
-    if not candidates:
+    if not candidates and not dead_branches:
         # Silent on zero hits (user dislikes chatty skills)
         if args.human:
             return 0
@@ -330,13 +480,24 @@ def main() -> int:
         return 0
 
     if args.human:
-        print(f"Candidate stale claims in {project_root}:")
-        for c in candidates:
-            print(f"\n  Rule {c['rule_id']}: {c['rule_title']}")
-            print(f"    Negated phrase: \"{c['negated_phrase']}\"")
-            for m in c["matches"]:
-                rel = os.path.relpath(m["file"], project_root)
-                print(f"    - {rel}:{m['line']}: {m['content']}")
+        if candidates:
+            print(f"Candidate stale claims in {project_root}:")
+            for c in candidates:
+                print(f"\n  Rule {c['rule_id']}: {c['rule_title']}")
+                print(f"    Negated phrase: \"{c['negated_phrase']}\"")
+                for m in c["matches"]:
+                    rel = os.path.relpath(m["file"], project_root)
+                    print(f"    - {rel}:{m['line']}: {m['content']}")
+        if dead_branches:
+            print(f"\nRetired rules still carrying a live-looking condition "
+                  f"in {project_root}:")
+            for c in dead_branches:
+                print(f"\n  Retired: \"{c['retired_subject']}\"")
+                print(f"    Ask: does that condition still occur? If not, the "
+                      f"branch is dead and reads as current guidance.")
+                for m in c["matches"]:
+                    rel = os.path.relpath(m["file"], project_root)
+                    print(f"    - {rel}:{m['line']}: {m['content']}")
         print("\n(No auto-edits performed. Review and update manually.)")
     else:
         print(json.dumps(result))

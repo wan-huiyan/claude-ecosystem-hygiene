@@ -31,3 +31,31 @@ Run:
 python3 scripts/reverse_lint.py evals/fixtures/fake_lesson_pvalue.md \
     --project-root evals/fixtures/project_with_stale_doc --rescan --human
 ```
+
+---
+
+## Dead-branch detection (v1.3.0)
+
+Fixture: `evals/fixtures/project_with_dead_branch/`.
+
+Two assertions off one fixture pair, run with a memory file that retires a
+quoted rule (`"no deploys by agents"`):
+
+| doc | expectation | why |
+|---|---|---|
+| `docs/runbooks/deploy_thing.md` | **flagged** | retires the rule and keeps *"A cloud session still cannot"* — a live-looking branch in the same paragraph |
+| `docs/runbooks/unrelated.md` | **not flagged** | mentions the same retired rule as history with no condition attached; the unrelated `only applies on Tuesdays` sits in its own paragraph |
+
+```bash
+python3 scripts/reverse_lint.py <memory-file-retiring-the-rule> \
+    --project-root evals/fixtures/project_with_dead_branch --human --rescan
+```
+
+Expected: exactly one `dead_branch_candidates` entry, matching
+`deploy_thing.md` only.
+
+**This is the case the mechanism was built from** — DoodleRun, 2026-08-04.
+*"No deploys by agents"* was retired across four live briefs and every
+retirement kept the cloud-session condition alive after cloud sessions had
+stopped existing. The retirement was right; the survivor was the defect, and it
+was caught by the owner rather than by tooling.
