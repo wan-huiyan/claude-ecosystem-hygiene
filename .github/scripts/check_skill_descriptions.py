@@ -1,8 +1,26 @@
 #!/usr/bin/env python3
 """Gate SKILL.md frontmatter descriptions against Claude Code's skill-listing cap.
 
-Vendored from wan-huiyan/context-police (scripts/check_skill_descriptions.py),
-re-copied at upstream v2.2.0. Do not edit here -- fix it upstream and re-copy.
+Vendored from wan-huiyan/context-police (scripts/check_skill_descriptions.py).
+Do not edit here -- fix it upstream and re-copy.
+
+PROVENANCE, exactly:
+    Upstream v2.2.0 (commit 4dc1a62) PLUS one uncommitted fix that was in upstream's
+    working tree when this was copied on 2026-08-04: find_wrap_corruption() now matches
+    the WHOLE block header including a chomping or explicit-indent indicator
+    (`>-`, `|+`, `|2`), and stops at the end of the block body instead of running on into
+    the next frontmatter key.
+
+    That fix is not cosmetic and is why it was taken ahead of a release. Without it, a
+    description written `description: >-` leaves the `-` behind as a phantom
+    one-character line, the hyphen test fires on it, and the gate FAILS CI on a
+    perfectly clean skill. Reproduced both ways against a two-skill fixture before
+    vendoring: the buggy version reports 3 hits (one bogus), the fixed version reports
+    the 2 real ones.
+
+    So this file is AHEAD of upstream's committed HEAD. Whoever re-copies next must
+    confirm upstream has committed the equivalent fix, and must not "restore" the older
+    regex.
 
 VENDORING NOTE, read before you re-copy:
     Upstream keeps the canonical script at scripts/check_skill_descriptions.py AND
@@ -231,10 +249,21 @@ def find_wrap_corruption(fm: str) -> list[str]:
     length check can see it because the char count is unchanged.
     """
     hits = []
-    m = re.search(r"^(description|whenToUse|when_to_use):\s*([|>])", fm, re.M)
+    # Match the WHOLE block header, including any chomping (`>-`, `|+`) or explicit-indent
+    # (`|2`) indicator. Stopping the match at the `|`/`>` leaves the chomping character
+    # behind as a phantom one-character line `-`, which then trips the hyphen test below
+    # and reports a bogus hit on every skill written with the very common `description: >-`.
+    m = re.search(r"^(description|whenToUse|when_to_use):[ \t]*[|>][-+]?\d*[ \t]*$", fm, re.M)
     if not m:
         return hits
-    lines = [l for l in fm[m.end():].splitlines() if l.strip()]
+    # Stay inside the block body: stop at the first non-indented line, which is the next key.
+    body = []
+    for line in fm[m.end():].splitlines():
+        if line.strip() and not line[:1].isspace():
+            break
+        if line.strip():
+            body.append(line)
+    lines = body
     for i, line in enumerate(lines[:-1]):
         stripped = line.strip()
         if not stripped.endswith("-"):
