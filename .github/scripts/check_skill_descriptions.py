@@ -1,42 +1,44 @@
 #!/usr/bin/env python3
 """Gate SKILL.md frontmatter descriptions against Claude Code's skill-listing cap.
 
-Vendored from wan-huiyan/context-police (scripts/check_skill_descriptions.py).
-Do not edit here -- fix it upstream and re-copy.
+--8<-- vendoring note (local addition; stripped before the parity hash) --8<--
+Vendored from wan-huiyan/context-police, scripts/check_skill_descriptions.py.
+Do not edit locally -- fix it upstream and re-vendor, so every repo's gate agrees.
 
 PROVENANCE, exactly:
-    Upstream v2.2.0 (commit 4dc1a62) PLUS one uncommitted fix that was in upstream's
-    working tree when this was copied on 2026-08-04: find_wrap_corruption() now matches
-    the WHOLE block header including a chomping or explicit-indent indicator
-    (`>-`, `|+`, `|2`), and stops at the end of the block body instead of running on into
-    the next frontmatter key.
+    upstream commit  eedad0f  (on context-police main)
+    upstream version 2.2.1    -- a plugin.json/marketplace version, NOT a git tag.
+                                 Upstream's newest tag is v2.0.0; there is no v2.2.x tag.
+    upstream sha256  f210ccd2feb4a3f76289e078bdc5621919ca657026f3d86cc5d7cb1201985fb0
+    re-vendored      2026-08-05
 
-    That fix is not cosmetic and is why it was taken ahead of a release. Without it, a
-    description written `description: >-` leaves the `-` behind as a phantom
-    one-character line, the hyphen test fires on it, and the gate FAILS CI on a
-    perfectly clean skill. Reproduced both ways against a two-skill fixture before
-    vendoring: the buggy version reports 3 hits (one bogus), the fixed version reports
-    the 2 real ones.
+    This file is byte-identical to that upstream revision apart from this note.
 
-    So this file is AHEAD of upstream's committed HEAD. Whoever re-copies next must
-    confirm upstream has committed the equivalent fix, and must not "restore" the older
-    regex.
+WHAT CHANGED SINCE THE PREVIOUSLY VENDORED v2.2.0 (commit 4dc1a62):
+    Only find_wrap_corruption(). It now matches the WHOLE block header including a
+    chomping or explicit-indent indicator (`>-`, `|+`, `|2`), and stops at the end of
+    the block body instead of running on into the next frontmatter key. Without that,
+    a description written `description: >-` leaves the `-` behind as a phantom
+    one-character line, the hyphen test fires on it, and the gate reports a bogus
+    BROKEN BY LINE-WRAP on a clean skill.
 
-VENDORING NOTE, read before you re-copy:
-    Upstream keeps the canonical script at scripts/check_skill_descriptions.py AND
-    ships a copy of it inside the skill itself, at
-    plugins/context-police/skills/context-police/scripts/. That nested skill dir is
-    exactly what .github/workflows/sync-context-police.yml rsyncs into this repo's
-    plugins/context-police/. So once upstream's copy lands on upstream main, this
-    repo will hold TWO copies of this script:
+    The cap arithmetic did NOT change. `desc_chars - (MAX_DESC_CHARS - 1)` was already
+    in v2.2.0, so re-vendoring moves no "N chars discarded" figure.
 
-        .github/scripts/check_skill_descriptions.py    <- this file, the CI gate
+TWO COPIES LIVE IN THIS REPO, read before you re-vendor:
+    Upstream keeps the canonical script at scripts/check_skill_descriptions.py AND ships
+    a copy inside the skill itself, at plugins/context-police/skills/context-police/
+    scripts/. That nested skill dir is what .github/workflows/sync-context-police.yml
+    rsyncs into this repo's plugins/context-police/. So this repo can hold two copies:
+
+        .github/scripts/check_skill_descriptions.py                 <- this file, the CI gate
         plugins/context-police/scripts/check_skill_descriptions.py  <- synced mirror
 
-    They are not the same file and nothing compares them: this one carries this
-    docstring header, and the mirror is overwritten wholesale by every sync. Treat
-    the mirror as upstream's payload, not as a second source of truth, and re-copy
-    THIS file from upstream's scripts/ directory by hand when upstream changes.
+    They are not the same file and nothing compares them: this one carries this header,
+    and the mirror is overwritten wholesale by every sync. Treat the mirror as upstream's
+    payload, not as a second source of truth, and re-vendor THIS file by hand from
+    upstream's scripts/ directory.
+--8<-- end vendoring note --8<--
 
 WHY THIS EXISTS
     Claude Code injects every model-invocable skill's name + description into
