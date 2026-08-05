@@ -1,5 +1,103 @@
 # Changelog — ecosystem-audit
 
+## v1.2.2 — 2026-08-04
+
+### Fix: description was over the skill-listing cap since v1.0.0 (159 chars invisible)
+
+**Problem.** Claude Code caps each model-invocable skill's listing entry at
+`skillListingMaxDescChars` (default 1536, read from the v2.1.221 binary) and truncates by
+keeping `full[:1535]` plus an ellipsis — no intelligent summarisation, no warning. This
+skill's description has been **1694 chars since the very first commit** (`bd256ab`,
+2026-04-17, "feat: initial marketplace release with 3 plugins"), so the last **159 chars were
+never once seen by the model**. What was silently dead:
+
+- `…cross-category coverage that neither provides alone.`
+- **`Use this proactively whenever the user describes ANY ecosystem-level symptom, even if they
+  don't explicitly ask for an "audit".`** — the entire proactive-invocation instruction, which
+  is the single sentence most responsible for the skill firing without being named.
+
+> **159, not 158.** The harness keeps `full[:cap-1]`, so the dead tail is
+> `len(desc) - (cap - 1)`, not `len(desc) - cap`. The gate under-reported every over-cap
+> skill by exactly one character until the off-by-one was fixed in context-police v2.2.0;
+> this entry quotes the corrected figure.
+
+**Fix.** Retrimmed to **1495 chars (41 under cap)**. Trigger vocabulary was preserved and
+extended; only prose and implementation detail were cut.
+
+- **Kept every quoted trigger phrase, including `"what needs cleanup"`.** An earlier cut of
+  this trim dropped that one as "a synonym of `clean up my ecosystem` / `audit my setup`";
+  `check_skill_descriptions.py --compare` reported it as `DROPPED`, and since it fits, it is
+  back. Deleting a phrase outright is invisible to the gate's `lost_triggers` count, which by
+  construction only counts phrases lost to *truncation*.
+- Added trigger surface that eval prompts relied on but the description lacked: `lessons`,
+  `feedbacks`, `ADRs`, `docs` in the opening scope line, `"give me a cleanup script"`, and
+  `"regenerate my stale audit"`.
+- Cut prose and implementation detail: `dark-themed`, `6 categories`, `health percentages`,
+  `ready-to-run`, `radar chart`, and the per-category list inside the report sentence (every
+  category name it held already appears in the opening scope line).
+- **Kept the sibling-skill positioning**, compressed: `schliff:doctor (per-skill quality)` and
+  `memory-hygiene (knowledge store)` are still named. That sentence is the only text saying
+  what this skill is *not*, and it is the disambiguator in an install where those two are also
+  present. See the measurement caveat below — the eval cannot price it.
+- The proactive-invocation sentence now fits and is live for the first time.
+
+**Measured against `evals/trigger_eval.json`** (10 positive / 10 negative prompts), word-overlap
+coverage. Baseline is `old_description[:1535]` — what the model actually read, not the full
+source. **Reproduce with the committed harness:**
+
+```
+python3 plugins/ecosystem-audit/scripts/score_trigger_coverage.py \
+    --old  main:plugins/ecosystem-audit/SKILL.md \
+    --new  plugins/ecosystem-audit/SKILL.md \
+    --eval plugins/ecosystem-audit/evals/trigger_eval.json
+```
+
+| metric | before (truncated) | after | Δ |
+|---|---|---|---|
+| positive mean coverage | 0.4968 | 0.5198 | **+0.0230** |
+| negative mean coverage | 0.1917 | 0.2042 | +0.0125 |
+| separation (pos − neg) | 0.3051 | 0.3156 | **+0.0105** |
+
+Per-prompt: **4 better / 6 same / 0 worse** on positives.
+
+Word overlap is stopword-list sensitive, so the harness prints an unfiltered run too, and
+both are reported here rather than only the flattering one:
+
+| metric (no stopword filter) | before | after | Δ |
+|---|---|---|---|
+| positive mean coverage | 0.5422 | 0.5650 | **+0.0228** |
+| negative mean coverage | 0.2988 | 0.3209 | +0.0221 |
+| separation (pos − neg) | 0.2434 | 0.2441 | +0.0007 |
+
+Positives are **4 better / 6 same / 0 worse** under both variants, so the positive-side result
+does not depend on the stopword list. Separation is the fragile number: it widens clearly with
+the filter and only marginally without it.
+
+> **Retraction.** v1.2.2's first draft quoted `0.4291 → 0.4525`, `0.2104 → 0.1937`,
+> `0.2187 → 0.2588` from a scoring script that was never committed. Those figures are
+> withdrawn: they are not reproducible from this repo, and a reviewer using a different
+> stopword list reproduced the direction but not the values. The numbers above come from
+> `scripts/score_trigger_coverage.py`, which is now in the tree.
+
+**What this measurement cannot see.** It scores one description against prompts *in isolation*,
+with no competing skill present, so removing a sibling skill's name can only ever register as a
+precision win. The negative prompt *"run schliff:doctor on my installed skills…"* moves
+0.625 → 0.750 here precisely *because* the `schliff:doctor` name was kept. Read that as the
+cost of keeping a real disambiguator, not as a regression — in an install where
+`schliff:doctor` exists, that name is what stops this skill from firing on it. Word overlap is
+also blind to trigger-condition restructuring; `check_skill_descriptions.py --compare` reports
+**0 DROPPED, 0 NARROWED** for this trim.
+
+**The cap is necessary, not sufficient.** Being under `skillListingMaxDescChars` means this
+description is *no longer truncated*. It does not mean it is visible:
+`skillListingBudgetFraction` (1% of the context window) is a budget shared across *every*
+installed skill, and when the listing exceeds it the harness collapses descriptions to bare
+names by usage rank, not by length.
+
+No behavioural change to the audit itself; body and report template are untouched. New
+`scripts/score_trigger_coverage.py` (measurement only — the gate is
+`.github/scripts/check_skill_descriptions.py`).
+
 ## v1.2.0 — 2026-04-25
 
 ### Change A: A/B-evidence-backed T1 promotion

@@ -1,25 +1,23 @@
 ---
 name: ecosystem-audit
-version: 1.2.1
-updated: 2026-06-01
+version: 1.2.2
+updated: 2026-08-04
 description: >
   ALWAYS use this skill when the user asks any question about their Claude Code setup, installed
-  skills, memory system, handoffs, worktrees, or ~/.claude directory health. This is the
-  go-to skill for introspection of the Claude Code environment itself. Specifically trigger on:
-  (1) Skill inventory questions — "how many skills do I have", "which skills am I using",
-  "what's dormant", "which skills can I uninstall", "are there overlapping skills"; (2) Cleanup
-  and hygiene requests — "clean up my ecosystem", "audit my setup", "~/.claude feels bloated",
-  "monthly hygiene check", "what needs cleanup", "stale worktrees", "orphaned handoff prompts";
-  (3) Diagnostic symptoms — "my memory system isn't working", "lessons aren't being picked up",
-  "skill is not triggering", "claude keeps forgetting", "why is the wrong skill firing",
-  "duplicate skill confusion"; (4) Health dashboards — "show me a health dashboard", "utilization
-  across skills/memory/handoffs", "ecosystem health report"; (5) Any mention of auditing
-  persistent artifacts, session logs, JSONL analysis, or cross-project memory files. The skill
-  produces an interactive dark-themed HTML report with a radar chart showing health percentages
-  across 6 categories (skills, memory, handoffs, ADRs, docs, worktrees) plus prioritized P0/P1/P2
-  recommendations and a ready-to-run cleanup script. It complements schliff:doctor (per-skill
-  structural quality) and memory-hygiene (persistent knowledge store) by adding runtime usage
-  analytics from JSONL session logs and cross-category coverage that neither provides alone.
+  skills, memory system, lessons, feedbacks, handoffs, worktrees, ADRs, docs, or ~/.claude
+  directory health. This is the go-to skill for introspection of the Claude Code environment
+  itself. Specifically trigger on: (1) Skill inventory — "how many skills do I have", "which
+  skills am I using", "what's dormant", "which skills can I uninstall", "are there overlapping
+  skills"; (2) Cleanup and hygiene — "clean up my ecosystem", "audit my setup", "~/.claude feels
+  bloated", "monthly hygiene check", "what needs cleanup", "stale worktrees", "orphaned handoff
+  prompts", "give me a cleanup script"; (3) Diagnostic symptoms — "my memory system isn't
+  working", "lessons aren't being picked up", "skill is not triggering", "claude keeps
+  forgetting", "why is the wrong skill firing", "duplicate skill confusion"; (4) Health
+  dashboards — "show me a health dashboard", "utilization across skills/memory/handoffs",
+  "ecosystem health report", "regenerate my stale audit"; (5) Any mention of auditing persistent
+  artifacts, session logs, JSONL analysis, or cross-project memory files. Produces an interactive
+  HTML report with P0/P1/P2 recommendations and a cleanup script, adding the runtime usage
+  analytics that schliff:doctor (per-skill quality) and memory-hygiene (knowledge store) lack.
   Use this proactively whenever the user describes ANY ecosystem-level symptom, even if they
   don't explicitly ask for an "audit".
 ---

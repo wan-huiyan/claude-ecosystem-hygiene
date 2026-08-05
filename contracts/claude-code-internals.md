@@ -1,6 +1,6 @@
 # Claude Code Internals Contract
 
-**Contract version:** 1.0.0 · **Verified as of:** 2026-07-03
+**Contract version:** 1.1.0 · **Verified as of:** 2026-08-04
 
 ## Purpose
 
@@ -54,7 +54,9 @@ assumption).
 |---|---|---|---|---|
 | SKILL.md frontmatter | YAML frontmatter with `name`, `description`; `disable-model-invocation: true` removes the skill from the always-injected catalog while keeping it user-invocable | docs-backed ([code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)) | 2026-07-03 | Docs page; flip the flag on a test skill and confirm it disappears from the catalog listing. context-police's global lever depends on this. |
 | `skillOverrides` in settings | Per-project `settings.json` `skillOverrides` map can hide/expose individual skills | docs-backed ([code.claude.com/docs/en/settings](https://code.claude.com/docs/en/settings)) | 2026-07-03 | Docs page; `probe_internals.py` notes whether the key is present in a live settings.json. context-police's per-project lever depends on this. |
-| Skill-listing budget defaults | `skillListingBudgetFraction` ≈ **0.01** of context window; `maxSkillDescriptionChars` ≈ **1536** | observed (via `/doctor` output) — **drift-prone, re-check every release** | 2026-07-03 | Run `/doctor` in Claude Code and read the skill-listing budget section. These are the constants context-police's token-tax math assumes; a silent default change skews every estimate. |
+| Skill-listing budget defaults | `skillListingBudgetFraction` ≈ **0.01** of context window; `skillListingMaxDescChars` ≈ **1536** per skill | observed (constant names + values read out of the v2.1.221 binary; `/doctor` shows the resulting budget) — **drift-prone, re-check every release** | 2026-08-04 | Run `/doctor` in Claude Code and read the skill-listing budget section; the constant *names* come from the bundled binary, so re-grep it after a major upgrade. These are the constants context-police's token-tax math assumes **and the constants `.github/scripts/check_skill_descriptions.py` gates on in CI** — a silent default change skews every estimate and mis-sets the gate. |
+| Skill-listing truncation semantics | Over `skillListingMaxDescChars` the harness keeps `full[:cap-1]` and appends an ellipsis — it does **not** summarise, it cuts mid-word, and nothing warns. So the dead tail of an over-cap description is `len(desc) - (cap - 1)` characters, one MORE than the naive `len(desc) - cap` | observed (binary; reproduced by the gate) | 2026-08-04 | `python3 .github/scripts/check_skill_descriptions.py . --triggers` on a deliberately over-cap SKILL.md and compare its "+N cut" figure against the text the model actually receives. The gate's own off-by-one here was corrected upstream in context-police v2.2.0. |
+| Naming: which constant is which | Canonical name is **`skillListingMaxDescChars`** (as in the binary and in `check_skill_descriptions.py`). `maxSkillDescriptionChars` is an **older alias** used in earlier revisions of this contract and in context-police's bundled SKILL.md before upstream v2.2.0 | observed | 2026-08-04 | Grep the repo for both spellings; only `skillListingMaxDescChars` should remain. Two names for one constant is how a gate and a doc silently stop describing the same thing. |
 | Settings precedence | Managed (enterprise) > CLI flags > `.claude/settings.local.json` > `.claude/settings.json` (project) > `~/.claude/settings.json` (user) | docs-backed ([code.claude.com/docs/en/settings](https://code.claude.com/docs/en/settings)) | 2026-07-03 | Docs page. Any tool that *writes* settings (context-police applier) must respect this ordering when predicting effective config. |
 
 ## Hooks
@@ -73,4 +75,5 @@ assumption).
 
 ## Change log
 
+- **1.1.0** (2026-08-04) — **Skill-listing cap row updated for its first load-bearing CI consumer.** `.github/scripts/check_skill_descriptions.py` now gates every PR and push on this constant, so the row records (a) the canonical name `skillListingMaxDescChars`, retiring the `maxSkillDescriptionChars` alias this file used at 1.0.0, (b) the evidence upgrade — constant names and values read out of the v2.1.221 binary, not only inferred from `/doctor` output, and (c) two new rows: the truncation semantics (`full[:cap-1]` + ellipsis, so the dead tail is `len(desc) - (cap - 1)`) and an explicit naming row, because the same constant carrying two names in one repo is exactly how a gate and a doc stop describing the same thing. Status stays **observed** and **drift-prone**: reading a constant out of one binary build is stronger evidence than `/doctor`, but it is still not documented and can move in any release.
 - **1.0.0** (2026-07-03) — Initial consolidation. Extracted from assumptions previously hardcoded independently in token-torch, context-police, memory-hygiene, session-handoff, and this bundle's plugins.
