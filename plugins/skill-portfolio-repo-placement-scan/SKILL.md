@@ -12,7 +12,7 @@ description: >
   improved locally", or wants to reorganize/consolidate a multi-repo skill portfolio. This
   is PLACEMENT/FIT mapping, and it produces a recommendation report — it never mutates repos.
   Don't use for (these are different tools): standardizing READMEs/badges or catching factual
-  errors across skills (`skill-portfolio-audit`), finding dormant/unused skills
+  errors across skills, finding dormant/unused skills
   (`ecosystem-audit`), searching for a skill by capability (`find-skills`/`search-skill`),
   scoring one skill's structural quality (`schliff`), syncing installed skills with their
   GitHub repos (`skill-sync`), or creating/publishing a brand-new skill (`skill-creator`).
