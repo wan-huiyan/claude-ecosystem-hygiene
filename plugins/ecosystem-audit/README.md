@@ -1,10 +1,12 @@
 # ecosystem-audit
 
-**Version:** 1.2.0 | **License:** MIT | **Author:** wan-huiyan
+**Version:** 1.2.3 | **License:** MIT | **Author:** wan-huiyan
 
-Full-coverage Claude Code ecosystem audit across 9 artifact categories. Orchestrates 4
-parallel scan subagents, scores each category on a 0–100% health scale, and generates
-an interactive HTML report with a radar chart and prioritized P0/P1/P2 cleanup actions.
+Full-coverage Claude Code ecosystem audit across 9 artifact categories — skills, memory,
+handoffs, ADRs, plans, reviews, findings, tasks, worktrees. Orchestrates 4 parallel scan
+subagents, scores them on 6 health axes (the four `docs/` categories roll up into one
+**Docs** axis), and generates an interactive HTML report with a radar chart and
+prioritized P0/P1/P2 cleanup actions.
 
 Part of [`claude-ecosystem-hygiene`](https://github.com/wan-huiyan/claude-ecosystem-hygiene)
 — the audit → measure → clean → stay-consistent pipeline.

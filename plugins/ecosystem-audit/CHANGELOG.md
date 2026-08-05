@@ -47,10 +47,17 @@ source. **Reproduce with the committed harness:**
 
 ```
 python3 plugins/ecosystem-audit/scripts/score_trigger_coverage.py \
-    --old  main:plugins/ecosystem-audit/SKILL.md \
-    --new  plugins/ecosystem-audit/SKILL.md \
+    --old  af97fee:plugins/ecosystem-audit/SKILL.md \
+    --new  ebb228a:plugins/ecosystem-audit/SKILL.md \
     --eval plugins/ecosystem-audit/evals/trigger_eval.json
 ```
+
+> **Refs pinned 2026-08-05.** This block originally read `--old main:… --new <worktree>`,
+> which was correct only while the trim was unmerged. Once #14 landed, `main` *became* the
+> post-trim state and the same command printed `0.5198 → 0.5198` — every delta zero, the
+> table apparently refuted by its own reproduce line. Both sides are now pinned to commits:
+> `af97fee` is the pre-trim parent, `ebb228a` the merge. Both tables below still reproduce to
+> four decimals, and the harness prints **both** stopword variants in one run.
 
 | metric | before (truncated) | after | Δ |
 |---|---|---|---|
@@ -97,6 +104,17 @@ names by usage rank, not by length.
 No behavioural change to the audit itself; body and report template are untouched. New
 `scripts/score_trigger_coverage.py` (measurement only — the gate is
 `.github/scripts/check_skill_descriptions.py`).
+
+## v1.2.1 — 2026-06-01
+
+*Backfilled 2026-08-05: this release shipped in `d556709` and was never given a CHANGELOG
+entry, leaving a gap between v1.2.0 and v1.2.2.*
+
+Recalibrate the `memory-hygiene` version pin from v3.0 to v3.3. The pin's baseline
+parenthetical still named v3.0. Verified the delegated interface (Phase 1 Discover +
+Phase 1h ADRs / MADR 4.0) is intact in v3.3, so the major-version pin still passes; this
+updates the stale calibration baseline to the verified-compatible current version. No
+behavioural change.
 
 ## v1.2.0 — 2026-04-25
 
@@ -161,3 +179,12 @@ Initial release. Full-coverage audit across 9 artifact categories (skills, memor
 ADRs, plans, reviews, worktrees, automation, provenance). Parses JSONL session logs for real
 skill invocation data. Produces interactive HTML report with radar chart and prioritized
 P0/P1/P2 cleanup actions.
+
+> **Correction (2026-08-05).** That category list was wrong on the day it was written and
+> was copied into both READMEs. `provenance` appears **zero** times in `SKILL.md`, and
+> `automation` only in an unrelated P0 example; neither has ever been a scanned category.
+> The nine are **skills, memory, handoffs, ADRs, plans, reviews, findings, tasks,
+> worktrees** — see `SKILL.md`'s scoring section, where `Docs` is defined as
+> `plans + reviews + findings + tasks`. They score on **6** radar axes because those four
+> roll up into one `Docs` axis, which is why "9 categories" and "6 axes" were both correct
+> and looked contradictory.

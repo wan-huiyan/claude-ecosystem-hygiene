@@ -137,7 +137,5 @@ NOTES:      <nothing-fits, dual-home issues, notable rejected near-misses>
 ```
 
 ## Relationship to other skills
-- `skill-portfolio-audit` — audits README/badge/factual *quality* across skills. This
-  skill decides *placement*. Run placement first (where does it live?), then audit.
 - `claude-plugin-repo-ci-release` — once you ADD skills to a repo and bump its version,
   that skill keeps the repo's release in lockstep.
