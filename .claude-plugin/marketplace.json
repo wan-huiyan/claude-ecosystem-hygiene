@@ -53,7 +53,7 @@
       "name": "skill-portfolio-repo-placement-scan",
       "source": "./plugins/skill-portfolio-repo-placement-scan",
       "description": "Scan a portfolio of authored Claude Code skills and produce, per target repo, a precise list of which skills to ADD, which to UPDATE (with drift direction), and which to CROSS-LINK rather than copy. Per-repo function bars + portfolio dedup + version divergence check. Decides placement; run before skill-portfolio-audit (quality).",
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "name": "claude-plugin-repo-ci-release",
