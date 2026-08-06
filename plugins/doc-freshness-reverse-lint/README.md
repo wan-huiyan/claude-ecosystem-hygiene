@@ -27,19 +27,38 @@ claude plugin install doc-freshness-reverse-lint@claude-ecosystem-hygiene
 
 ### Hook wiring (required for event-driven mode)
 
-Add to `~/.claude/settings.json` under `hooks.PostToolUse` → the `Edit|Write` matcher's `hooks` array:
+A hook `command` is a literal string, and a wrong path fails **silently** — the hook just never fires. So print the real path first, then paste it.
+
+**Step 1 — print the installed path.** A `/plugin install` unpacks to `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`, so it creates neither `~/.claude/skills/doc-freshness-reverse-lint/` nor a set `$CLAUDE_PLUGIN_ROOT`. This tries all three roots:
+
+```bash
+n=hook_dispatch.sh
+s="${CLAUDE_PLUGIN_ROOT:+${CLAUDE_PLUGIN_ROOT}/scripts/$n}"
+[ -f "$s" ] || s="$HOME/.claude/skills/doc-freshness-reverse-lint/scripts/$n"
+# find, not a glob (zsh fails a non-matching glob before 2>/dev/null applies);
+# rank on the VERSION segment alone, or aaa-mkt/2.5.0 loses to zzz-mkt/1.0.0.
+[ -f "$s" ] || s="$(find -L "$HOME/.claude/plugins/cache" -mindepth 5 -maxdepth 5 \
+    -path "*/doc-freshness-reverse-lint/*/scripts/$n" 2>/dev/null \
+  | awk -F/ '{print $(NF-2)"\t"$0}' | sort -V -k1,1 | tail -1 | cut -f2- || true)"
+[ -f "$s" ] && echo "$s" \
+  || echo "$n: not found - tried \$CLAUDE_PLUGIN_ROOT/scripts/, ~/.claude/skills/doc-freshness-reverse-lint/scripts/, and the plugin cache"
+```
+
+**Step 2 — paste that absolute path** into `~/.claude/settings.json` under `hooks.PostToolUse` → the `Edit|Write` matcher's `hooks` array:
 
 ```json
 {
   "type": "command",
-  "command": "~/.claude/skills/doc-freshness-reverse-lint/scripts/hook_dispatch.sh",
+  "command": "<absolute path printed by step 1>",
   "timeout": 10
 }
 ```
 
-(If you installed via `/plugin install`, adjust the path to point into the plugin's cache dir, or keep a symlinked copy under `~/.claude/skills/`.)
+Re-run step 1 after every plugin upgrade: the cache path carries the version segment, so an upgrade strands a pinned hook on the old directory.
 
 ## Invocation
+
+Paths below are relative to the plugin directory. If you are not `cd`'d into it, resolve the script with the three-root snippet in [Hook wiring](#hook-wiring-required-for-event-driven-mode) (swap `hook_dispatch.sh` for the script you want) instead of hardcoding `~/.claude/skills/…`, which does not exist on a plugin install.
 
 ```bash
 # Reverse-lint a specific memory file (scope inferred from path)
