@@ -123,10 +123,12 @@ hook (its precision is too low for real-time interrupt).
 - **Phase 4 step 24** runs `reverse_lint.py` against every `lessons.md` /
   `axioms.md` / `feedback_*.md` touched this session. Candidates appear in a
   "Stale docs to review" section of the handoff doc.
-- **Phase 4 step 24b** would run `skill_freshness_audit.py` when any SKILL.md was
-  edited this session, flagging expired `last_verified` and project-scoped
-  skills missing the freshness contract. That script is **not bundled in this
-  marketplace copy** (see mechanism 3), so this step is a no-op here.
+- **Phase 4 step 24b** runs `skill_freshness_audit.py` when any SKILL.md was edited
+  this session, flagging expired `last_verified` and project-scoped skills missing
+  the freshness contract. **That script ships with `session-handoff` itself, not with
+  this plugin** — step 24b resolves it from session-handoff's own bundle and works
+  normally. Mechanism 3 above describes the same idea, but no script for it is bundled
+  here, so nothing in *this* plugin implements it.
 
 Both are non-blocking: zero candidates → exit silent. A lookup that misses must be
 reported as **"not found - tried <paths>"** with the roots it searched, never as
