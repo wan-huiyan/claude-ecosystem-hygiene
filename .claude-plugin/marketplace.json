@@ -35,7 +35,7 @@
       "name": "doc-freshness-reverse-lint",
       "source": "./plugins/doc-freshness-reverse-lint",
       "description": "Detect stale normative guidance in project docs/ after a correction lands in lessons.md / axioms.md / feedback_*.md. Event-driven PostToolUse hook + weekly cron audit. Also audits ~/.claude/skills/ for expired last_verified frontmatter (axiom #21). Invoked by session-handoff Phase 4. Lists file:line candidate stale claims \u2014 never auto-edits.",
-      "version": "1.3.0"
+      "version": "1.4.0"
     },
     {
       "name": "test-effectiveness-auditor",

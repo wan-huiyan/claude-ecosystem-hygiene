@@ -21,8 +21,8 @@ description: |
   the heuristic project-marker scan is opt-in via `--scan-untagged`. If zero hits,
   the skill exits silent.
 author: Claude (for Huiyan, 2026-04-24)
-version: 1.3.0
-date: 2026-08-04
+version: 1.4.0
+date: 2026-08-06
 ---
 
 # Doc Freshness Reverse-Lint
@@ -94,6 +94,11 @@ entries, flags contradictions.
 
 ### 3. Skill freshness audit (per axiom #21)
 
+**Design only — `skill_freshness_audit.py` is not bundled in this marketplace copy.**
+The scripts that ship here are `reverse_lint.py`, `weekly_audit.py`, and
+`hook_dispatch.sh`. The rest of this section describes the intended mechanism, not a
+script you can run.
+
 Scans `~/.claude/skills/<name>/SKILL.md` for two explicit signals:
 
 - **`last_verified` exceeded `staleness_window_days`** (default 90): the skill
@@ -118,13 +123,18 @@ hook (its precision is too low for real-time interrupt).
 - **Phase 4 step 24** runs `reverse_lint.py` against every `lessons.md` /
   `axioms.md` / `feedback_*.md` touched this session. Candidates appear in a
   "Stale docs to review" section of the handoff doc.
-- **Phase 4 step 24b** runs `skill_freshness_audit.py` when any SKILL.md was
-  edited this session, flagging expired `last_verified` and project-scoped
-  skills missing the freshness contract.
+- **Phase 4 step 24b** runs `skill_freshness_audit.py` when any SKILL.md was edited
+  this session, flagging expired `last_verified` and project-scoped skills missing
+  the freshness contract. **That script ships with `session-handoff` itself, not with
+  this plugin** — step 24b resolves it from session-handoff's own bundle and works
+  normally. Mechanism 3 above describes the same idea, but no script for it is bundled
+  here, so nothing in *this* plugin implements it.
 
-Both are non-blocking: zero candidates → exit silent; script not installed →
-log and continue. `session-handoff` Phase 6 surfaces non-empty candidates back
-to the user in the live-dashboard recap when relevant.
+Both are non-blocking: zero candidates → exit silent. A lookup that misses must be
+reported as **"not found - tried <paths>"** with the roots it searched, never as
+"not installed" — see Invocation step 0 for the three roots that must all be tried.
+`session-handoff` Phase 6 surfaces non-empty candidates back to the user in the
+live-dashboard recap when relevant.
 
 ### 5. Invocation by `memory-hygiene` (v3.3+)
 
@@ -134,23 +144,72 @@ docs, plans, or skills that hard-code the old path.
 
 ## Invocation
 
+### Step 0 — resolve the script path (required, run this first)
+
+**Never invoke these scripts through `~/.claude/skills/…` alone.** A plugin install
+unpacks to `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` and creates
+neither `~/.claude/skills/<plugin>/` nor a set `$CLAUDE_PLUGIN_ROOT` (that variable
+is usually unset in the shell a step actually runs in, and it points at the *calling*
+plugin's own root, so it can never reach a sibling plugin). A hardcoded
+`~/.claude/skills/` path simply misses, and the usual "log and continue" fallback
+makes the step do nothing while the summary still reads clean.
+
+Paste this helper into the same shell before any invocation below:
+
+```bash
+# Resolve a bundled script across all three install roots.
+# Usage: S="$(dfrl_script reverse_lint.py)"
+dfrl_script() {
+  local n="$1" s=""
+  s="${CLAUDE_PLUGIN_ROOT:+${CLAUDE_PLUGIN_ROOT}/scripts/$n}"
+  [ -f "$s" ] || s="$HOME/.claude/skills/doc-freshness-reverse-lint/scripts/$n"
+  # find, not a shell glob: under zsh a non-matching glob fails at expansion time,
+  # BEFORE 2>/dev/null can apply, and prints a raw shell error.
+  # Rank on the VERSION segment alone (the awk) — the marketplace name precedes the
+  # version in the path, so a plain `sort -V` over whole paths ranks by marketplace
+  # name and lets aaa-mkt/2.5.0 lose to zzz-mkt/1.0.0.
+  [ -f "$s" ] || s="$(find -L "$HOME/.claude/plugins/cache" -mindepth 5 -maxdepth 5 \
+      -path "*/doc-freshness-reverse-lint/*/scripts/$n" 2>/dev/null \
+    | awk -F/ '{print $(NF-2)"\t"$0}' | sort -V -k1,1 | tail -1 | cut -f2- || true)"
+  [ -f "$s" ] && printf '%s\n' "$s"
+}
+```
+
+### Invocations
+
 ```bash
 # Reverse-lint a specific memory file (project scope inferred from path)
-python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/reverse_lint.py \
-    <memory-file-path> [--project-root PATH] [--rescan]
+S="$(dfrl_script reverse_lint.py)"
+if [ -n "$S" ]; then
+  python3 "$S" <memory-file-path> [--project-root PATH] [--rescan]
+else
+  echo "reverse_lint.py: not found - tried \$CLAUDE_PLUGIN_ROOT/scripts/, ~/.claude/skills/doc-freshness-reverse-lint/scripts/, and the plugin cache"
+fi
 
 # Weekly audit over a project
-python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/weekly_audit.py \
-    --project-root /Users/<user>/Documents
-
-# Skill freshness audit (default — silent unless explicit signals present)
-python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/skill_freshness_audit.py \
-    [--human] [--max-age-days 90] [--skills-root ~/.claude/skills]
-
-# Skill freshness audit with heuristic scan over untagged skills (audit-only)
-python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/skill_freshness_audit.py \
-    --scan-untagged --human
+S="$(dfrl_script weekly_audit.py)"
+if [ -n "$S" ]; then
+  python3 "$S" --project-root /Users/<user>/Documents
+else
+  echo "weekly_audit.py: not found - tried \$CLAUDE_PLUGIN_ROOT/scripts/, ~/.claude/skills/doc-freshness-reverse-lint/scripts/, and the plugin cache"
+fi
 ```
+
+**Always guard BEFORE redirecting.** `python3 "$S" … > "$OUT"` creates and truncates
+`$OUT` before the command is exec'd, so an unguarded call on a failed lookup leaves a
+0-byte file that a later step reads as a real, empty result. Put the redirect inside
+the `if`, never outside it.
+
+Report a failed lookup as **"not found - tried <paths>"**, never as "not installed".
+A lookup that missed is not evidence about install state, and a bare "not installed"
+has already been misread by a human as proof that a skill was absent.
+
+**`skill_freshness_audit.py` (mechanism 3) is not bundled in this marketplace copy.**
+It is described below because the mechanism is part of the skill's design, but
+`plugins/doc-freshness-reverse-lint/scripts/` ships only `reverse_lint.py`,
+`weekly_audit.py`, and `hook_dispatch.sh` — there is no path, under any install
+method, at which the freshness-audit script exists. Do not invoke it and do not
+report it as installed-but-unfound; treat mechanism 3 as unimplemented here.
 
 Exit codes: `0` = ran cleanly (zero or more candidates). Candidate JSON goes to stdout;
 `--human` flag switches to terminal-friendly output.
@@ -178,15 +237,36 @@ Exit codes: `0` = ran cleanly (zero or more candidates). Candidate JSON goes to 
 
 ## Hook wiring (PostToolUse on Edit|Write)
 
-Add to `~/.claude/settings.json` under `hooks.PostToolUse[matcher="Edit|Write"].hooks`:
+A `settings.json` hook command is a literal string — it cannot resolve anything at
+fire time, and a wrong path fails **silently**: the hook simply never produces
+output and nothing tells you it did not run. So resolve the path once, then paste
+the result.
+
+**Step 1 — print the real path** (uses the `dfrl_script` helper from Invocation step 0):
+
+```bash
+dfrl_script hook_dispatch.sh || echo "hook_dispatch.sh: not found - tried \$CLAUDE_PLUGIN_ROOT/scripts/, ~/.claude/skills/doc-freshness-reverse-lint/scripts/, and the plugin cache"
+```
+
+**Step 2 — paste that absolute path** into `~/.claude/settings.json` under
+`hooks.PostToolUse[matcher="Edit|Write"].hooks`:
 
 ```json
 {
   "type": "command",
-  "command": "~/.claude/skills/doc-freshness-reverse-lint/scripts/hook_dispatch.sh",
+  "command": "<absolute path printed by step 1>",
   "timeout": 10
 }
 ```
+
+Only write the literal `~/.claude/skills/doc-freshness-reverse-lint/scripts/hook_dispatch.sh`
+if step 1 actually printed it — that path exists only when the skill was copied in
+by hand, not when it was installed as a plugin.
+
+**Re-run step 1 after every plugin upgrade.** A plugin-cache path contains the
+version segment (`…/doc-freshness-reverse-lint/1.4.0/scripts/…`), so upgrading
+leaves the pinned hook pointing at the old version's directory, or at nothing once
+the old version is pruned.
 
 The dispatcher:
 - Reads `tool_input.file_path` from stdin.
@@ -200,10 +280,20 @@ The dispatcher:
 
 Use `mcp__scheduled-tasks__create_scheduled_task` with cron `0 9 * * 1` (Mon 09:00) to run:
 
+```bash
+# dfrl_script is the helper from Invocation step 0 — a cron shell has no
+# $CLAUDE_PLUGIN_ROOT and a plugin install has no ~/.claude/skills/ entry, so the
+# path must be resolved at run time, inside the scheduled command itself.
+S="$(dfrl_script weekly_audit.py)"
+if [ -n "$S" ]; then
+  python3 "$S" --project-root /Users/<user>/Documents --max-age-days 30
+else
+  echo "weekly_audit.py: not found - tried \$CLAUDE_PLUGIN_ROOT/scripts/, ~/.claude/skills/doc-freshness-reverse-lint/scripts/, and the plugin cache"
+fi
 ```
-python3 ~/.claude/skills/doc-freshness-reverse-lint/scripts/weekly_audit.py \
-    --project-root /Users/<user>/Documents --max-age-days 30
-```
+
+If the scheduled command runs in a shell that has not sourced `dfrl_script`, inline
+the helper's body into the same command rather than falling back to a fixed path.
 
 The audit:
 - Extracts all `### NN.` negation rules added to `lessons.md` in the last 30 days
