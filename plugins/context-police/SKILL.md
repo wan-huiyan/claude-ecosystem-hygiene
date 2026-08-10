@@ -1,23 +1,23 @@
 ---
 name: context-police
 description: |
-  Use when an agent harness's skills/tools catalog has grown large (hundreds+, e.g. from an auto-skill-minting
-  loop) and is taxing context: the listing of skill names+descriptions is injected every turn AND into every
-  subagent, so cost multiplies on fan-out and small-context agents can overflow ("Prompt is too long" at 0
-  tokens). This skill is the AUDIT + CURATION methodology plus measurement/reporting: the trimming levers are
-  now native harness features — the durable value is deciding WHAT to trim (episodic lessons vs real skills),
-  applying it safely, and measuring the result. The PROBLEM + METHODOLOGY are harness-agnostic — the Agent
-  Skills standard (agentskills.io) is shared by Claude Code, Cursor, Codex, Copilot CLI, Gemini CLI; only the
-  levers differ.
-  Covers: the portable diagnosis + classification rigor (curate by INTENT not name, conservative asymmetry,
-  blind re-rate, deterministic checks over LLM votes); the cross-harness landscape (native budgets vs manual
-  curation); the Claude Code levers (`skillOverrides`, `disable-model-invocation`, the native
+  Use when an agent harness's skills/tools catalog has grown large (hundreds+, e.g. an auto-skill-minting
+  loop) and is taxing context: the name+description listing is injected every turn AND into every subagent, so
+  cost multiplies on fan-out and small-context agents can overflow ("Prompt is too long" at 0 tokens). Also
+  use when a description exceeds the per-skill cap — the harness truncates mid-word and every trigger phrase
+  past the cut goes silently dead. This skill is the AUDIT + CURATION methodology, measurement/reporting, and
+  a publish-time description gate: the trimming levers are now native, so the durable value is deciding WHAT
+  to trim (episodic lessons vs real skills), applying it safely, and measuring the result. The PROBLEM +
+  METHODOLOGY are harness-agnostic — the Agent Skills standard (agentskills.io) is shared by Claude Code,
+  Cursor, Codex, Copilot CLI, Gemini CLI; only levers differ. Covers: classification rigor (curate by INTENT
+  not name, conservative asymmetry, blind re-rate); the cross-harness landscape; the Claude Code levers
+  (`skillOverrides`, `disable-model-invocation`, the native
   `skillListingBudgetFraction`/`skillListingMaxDescChars` budget read via `/doctor`, and the anti-pattern of
-  raising the fraction); the `disable-model-invocation` DUAL-ROLE footgun (also the correct setting for a user
-  slash-command — so a "name-invoked → restore" audit is a false-positive machine); plus a history footnote (a
-  retrieval-hook replacement was killed by a base-rate wall).
+  raising the fraction); the per-skill description cap and the triggers truncation destroys; and the
+  `disable-model-invocation` DUAL-ROLE footgun — also the correct setting for a user slash-command, so a
+  "name-invoked → restore" audit is a false-positive machine.
 author: Claude Code
-version: 2.0.0
+version: 2.4.0
 date: 2026-06-17
 ---
 
@@ -96,8 +96,11 @@ public docs as of the research date — confirm before relying.)*
    - **`skillListingBudgetFraction`** (default `0.01` = 1%): when the listing exceeds 1% of context, the
      **least-used** skills' descriptions collapse to bare names (still `/name`- and model-invocable; the model just
      can't see *why*). Usage-ranked auto-curation, every session.
-   - **`skillListingMaxDescChars`** (default `1536`): per-skill cap on `description`+`when_to_use`; longer is
-     **truncated** (independent of the budget). Keep your OWN skills' descriptions ≤1536.
+   - **`skillListingMaxDescChars`** (default `1536`): per-skill cap on `description`+`whenToUse` (the harness
+     joins them with `" - "` and caps the pair); longer is **truncated** (independent of the budget). Keep your
+     OWN skills' descriptions ≤1536 — enforce it with `scripts/check_skill_descriptions.py` (below).
+     *(The setting is `skillListingMaxDescChars`; earlier revisions of this skill called it
+     `maxSkillDescriptionChars`, which no `settings.json` key matches. Verified against the v2.1.221 binary.)*
    - `/doctor`'s **Skills ⚠** check prints `N descriptions will be dropped (X%/1% of context)`, the per-entry-cap
      offenders, and the token cost of opting in. It is the canonical readout — re-run it after any change.
    - **THE ANTI-PATTERN: do NOT raise `skillListingBudgetFraction` to silence `/doctor`.** The 1% default *is*
@@ -165,15 +168,202 @@ relevant to *this* project; a missed cut is just unrealized savings. Method (≈
 4. **Final guard:** scan the OFF-set for protect-marker substrings, eyeball the hits. Keep the generator + review
    JSON + a decision record for provenance and easy revert.
 
+## The publish-time gate: per-skill description cap (`scripts/check_skill_descriptions.py`)
+Everything above curates a catalog you INHERITED. This is the upstream half — stop an oversized description
+from shipping in the first place. Zero-dependency, exit 1 on violation, drop it in CI.
+```bash
+python3 scripts/check_skill_descriptions.py .              # gate a skill repo
+python3 scripts/check_skill_descriptions.py . --triggers   # what truncation is destroying
+python3 scripts/check_skill_descriptions.py . --context 1000000 --json
+```
+
+**Why the cap matters more than the token cost.** Going over does not cost tokens — the budget is a hard cap.
+It costs *descriptions*, and truncation is **not** intelligent: the harness keeps `full[:1535]` and appends an
+ellipsis. A description is trigger text, so every `when the user says "…"` phrase living past that character
+position is **already dead** — the skill will not fire on it and nothing reports the loss.
+
+**This inverts the safety question for trimming.** The instinct is "if I cut the description, will the skill
+still work?" But an over-cap description is already cut; the only question is whether YOU choose what survives
+or the harness chooses by character position. `--triggers` lists the quoted phrases past the cut, so a
+deliberate trim is verifiable: re-run until that section is empty.
+
+Measured on a real 18-plugin install (2026-08-04): **12 skills over cap, 30 trigger phrases invisible.** One
+skill had lost all 11 triggers for an entire documented feature — `"budget mode"`, `"cheap review"`,
+`"token-efficient review"` and the rest — so the feature could not be invoked by any of its own trigger
+phrases while still being fully documented in the body.
+
+**Not the same check as SKILL.md body size.** The body lazy-loads only when the skill fires; the description is
+resident every turn. A 1,620-char description with a tiny body passes a body-size linter and fails here; the
+reverse also holds. The two are independent — run both. Worse, a body-size pass gives false comfort: on
+`agent-review-panel` a schliff quality pass (75→86) left the description at **1,501 chars — 35 under the cap**;
+the very next feature commit pushed it to 2,004 and schliff never complained, because it does not measure
+descriptions.
+
+## Trimming an over-cap description SAFELY (the verified procedure)
+Detecting the problem is the easy half. Trimming trigger text is where a careless fix does real damage, so
+this is a measured procedure, not a style guide. Validated end-to-end on `agent-review-panel` (2,703 → 1,505
+chars, 25 dead triggers recovered).
+
+1. **Run `--triggers` BEFORE touching anything.** You are not deciding whether to cut; the harness already cut.
+   You are deciding what survives. Know what is currently dead first.
+2. **Compress synonym runs; never delete concepts.** The model generalizes from `"cheap review"` to
+   `"frugal review"` — it cannot generalize from a phrase it never sees. Ten literal synonyms for one concept
+   is waste; two or three representatives carry it. Every *distinct* concept stays.
+3. **Cut prose, not trigger vocabulary.** Implementation detail ("3 sonnet reviewers, one debate round, opus
+   judge") belongs in the body. The description's only job is to make the model reach for the skill.
+4. **Keep the NOT-for list.** It is precision — it is what stops false firing.
+5. **Measure against the right baseline.** Score each known trigger prompt (an `eval-suite.json`, or the
+   skill's own trigger list) by word overlap against **`old[:cap-1]`** — what the model *actually saw* — not
+   against the full oversized source. Using the full source as baseline includes text the model never read and
+   makes every honest trim look like a regression.
+6. **Expect the first attempt to regress, and check.** The measured first pass on `agent-review-panel` scored
+   **11 better / 18 same / 10 WORSE**. The failure mode is predictable: you optimize the distinctive mode
+   triggers and quietly drop natural-language phrases like `"critical look from security and performance
+   angles"`. Diagnose mechanically — set-difference the word sets, count how many prompts each dropped word
+   serves, restore exactly those, re-cut. The shipped second pass measures **12 better / 27 same / 0 worse**
+   against the committed harness. (The first-pass figure is from an intermediate state that was never
+   committed and does not reproduce; the second-pass one does.)
+7. **Track SEPARATION, not just positive coverage.** Score the negative prompts too. A trim that lifts positive
+   coverage by adding generic words also lifts false firing. Report `positive_mean − negative_mean` before and
+   after; it must widen or hold (`agent-review-panel`: **+0.2605 → +0.3183**).
+8. **Leave headroom (~30–50 chars).** A trim landing at cap−2 is one edit from breaking again.
+9. **Preserve the file's YAML scalar style** (`>` folded / `|` block / plain), and **re-wrap with
+   `break_on_hyphens=False`.** See the corruption trap below — this one bit the reference fix itself.
+10. **Commit the scoring harness, and pin its refs to COMMITS.** A PR that cites coverage numbers
+    from an uncommitted scratch script is asking a reviewer to take them on faith. Keep the
+    stopword list small and inline: a large one is a free parameter that can be tuned until the
+    numbers look good. And write `--old <sha>:path --new <sha>:path`, never `--old main:path` —
+    that is correct only while the trim is unmerged. Once it lands, `main` *becomes* the post-trim
+    state and the same command prints `0.5198 → 0.5198`, a table of zero deltas that reads as
+    though it refutes the table above it. This happened to `claude-ecosystem-hygiene`.
+
+11. **`--compare` only sees DOUBLE-QUOTED spans.** `extract_triggers()` matches `"..."` and
+    `“...”` and nothing else, so **backticked literals are invisible to it** — error strings,
+    flags, file paths. An empty `DROPPED` table is not proof that no trigger was lost.
+    `publish-skill`'s own 2,385 → 1,503 trim silently removed three backticked error literals and
+    `--compare` reported 0 dropped. Diff the backticked spans of the **description** by hand too
+    (a whole-file diff finds nothing, because the body usually still carries them):
+    ```bash
+    desclit() { python3 -c '
+    import re,sys
+    t=open(sys.argv[1]).read() if len(sys.argv)>1 else sys.stdin.read()
+    fm=re.match(r"^---\n([\s\S]*?)\n---",t).group(1)
+    d=re.search(r"(?m)^description:\s*[|>]-?\s*\n((?:[ \t]+.*\n?)*)",fm).group(1)
+    d=" ".join(l.strip() for l in d.split("\n") if l.strip())
+    print("\n".join(sorted(set(re.findall(r"`([^`\n]{3,90})`",d)))))
+    ' "$@"; }
+
+    diff <(git show main:<path/SKILL.md> | desclit) <(desclit <path/SKILL.md>)
+    ```
+
+### If you vendor this gate, pin a DIGEST — not a feature grep
+Six repos copy `check_skill_descriptions.py` in. A vendored copy rots silently, so each one wants
+a guard. **Do not write that guard as a feature-presence grep.**
+
+`publish-skill` had a test named *"the vendored gate is current with upstream, not a stale fork"*
+asserting the file contained `find_wrap_corruption(`, `compare_descriptions(` and
+`MAX_DESC_CHARS - 1)`. Its copy **was** a stale fork — a revision whose `find_wrap_corruption()`
+reported a bogus `BROKEN BY LINE-WRAP` on every `description: >-` skill. All three substrings were
+present, because the drift was *inside* a function whose name never changed. **The test stayed
+green through the entire drift.** A feature grep answers "does this version have the feature",
+never "is this the version I vendored".
+
+Wrap the local note in strip markers and hash the remainder:
+
+```js
+const OPEN  = '--8<-- vendoring note (local addition; stripped before the parity hash) --8<--\n';
+const CLOSE = '--8<-- end vendoring note --8<--\n\n';
+const s = local.indexOf(OPEN), e = local.indexOf(CLOSE, s);
+const stripped = local.slice(0, s) + local.slice(e + CLOSE.length);
+assert.equal(createHash('sha256').update(stripped, 'utf8').digest('hex'), UPSTREAM_SHA256);
+```
+
+Then **name the test for what it proves** — "matches the upstream revision it was vendored from",
+not "is current with upstream" — and say so in the body: this **can** see local edits and drift
+from the pin; it **cannot** see upstream moving on, because CI has no access to this repo.
+Re-vendoring stays a deliberate act. Prove the guard works by restoring the old copy and watching
+it go red.
+
+The note should also record that a version like `2.3.0` here is a `plugin.json`/`marketplace.json`
+version, **not a git tag** — this repo's newest tag is `v2.0.0`, and "v2.2.0" in six downstream
+repos meant a commit subject.
+
+### The line-wrap corruption trap (silent, and no length check can see it)
+A `>` folded or `|` block scalar joins its lines with a **space** — and Python's `textwrap.wrap()`
+breaks on hyphens **by default**. Re-wrapping a description therefore splits hyphenated tokens
+across lines, and the harness injects them broken:
+```
+"high- stakes"              was "high-stakes"
+"token- efficient review"   was "token-efficient review"
+```
+Both were *trigger phrases in the very fix that was restoring triggers.* The character count is
+identical, so a cap check passes and a coverage score barely moves. `check_skill_descriptions.py`
+now flags any folded-scalar line ending in a hyphen followed by an alphanumeric (`BROKEN BY
+LINE-WRAP`) and fails the gate on it. Independently observed in two different repos this session —
+assume it is present wherever descriptions have been machine-wrapped.
+
+### Word-overlap scoring has a blind spot; `--compare` covers it
+Bag-of-words coverage cannot see **trigger-condition restructuring**. Rewriting
+`trigger on X — separately, watch for Y` into `trigger on X WHOSE Y` preserves the identical word
+set, so any overlap metric scores it **identically** — while the trigger now only fires for users
+who have *already diagnosed* Y. That is a narrowed trigger surface passing a green metric.
+```bash
+python3 scripts/check_skill_descriptions.py --compare main:path/SKILL.md path/SKILL.md
+```
+Pairs each trigger old→new (fuzzy, so a rephrasing does not read as drop+add) and reports
+`DROPPED` / `NARROWED` / `REWORDED` / `REPHRASED`. **`NARROWED` and `REWORDED` need a human read —
+do not clear them with a coverage number.**
+
+### The cap is necessary, NOT sufficient — do not overclaim
+Two independent limits gate a description. Getting under `skillListingMaxDescChars` only means it
+is *no longer truncated*; `skillListingBudgetFraction` can still collapse it to a bare name because
+the whole listing is over budget, and that collapse is **usage-ranked**, not length-ranked. On a
+real 18-plugin install only ~41% of descriptions survive the budget at 1M context. So "restored N
+triggers" is honest only as *"no longer truncated"* — never as *"guaranteed visible"*. State both
+limits, or the headline claim is contingent on a fact the PR never checked.
+
+**Regression archaeology — find WHEN the cap broke.** Walk the description length across history; the breach
+commit is usually a feature that appended triggers without checking:
+```bash
+git log --format='%H %s' --reverse   # extract the description at each commit, flag the first over the cap
+```
+On `agent-review-panel` this exposed the sharpest failure mode of all: the breach was v2.14, and **v3.7.1 — a
+release whose entire stated purpose was "broaden budget-mode triggers for discoverability" — added five phrases
+that ALL landed past the cut.** It shipped, was documented, changelogged, and delivered exactly nothing.
+*Adding triggers to an already-over-cap description is not a no-op; it is a silent no-op that reads as a
+feature.* Check the cap before writing a discoverability release.
+
 ## Optional: interactive recap report (`scripts/render_treatment_report.py`)
 After a treatment, render a self-contained, interactive HTML recap (reads `.claude/settings.json` + the skills dir,
 computes counts + the bare-name token estimate; clickable tiles → a searchable explorer of every skill by decision).
 Honest-by-construction; opens from `file://`.
 ```bash
-python3 ~/.claude/skills/context-police/scripts/render_treatment_report.py \
-  --settings .claude/settings.json [--skills-dir ~/.claude/skills] \
-  [--decisions panel-decisions.json] [--title "My Project"] [--out skill-treatment.html]
+# Resolve across all three install roots. A plugin install creates neither of the first two.
+S="${CLAUDE_PLUGIN_ROOT:+${CLAUDE_PLUGIN_ROOT}/skills/context-police/scripts/render_treatment_report.py}"
+[ -f "$S" ] || S="$HOME/.claude/skills/context-police/scripts/render_treatment_report.py"
+[ -f "$S" ] || S="$(find -L "$HOME/.claude/plugins/cache" -mindepth 7 -maxdepth 7 \
+    -path '*/context-police/*/skills/context-police/scripts/render_treatment_report.py' 2>/dev/null \
+  | awk -F/ '{print $(NF-4)"\t"$0}' | sort -V -k1,1 | tail -1 | cut -f2-)"
+
+if [ -f "$S" ]; then
+  python3 "$S" \
+    --settings .claude/settings.json [--skills-dir ~/.claude/skills] \
+    [--decisions panel-decisions.json] [--title "My Project"] [--out skill-treatment.html]
+else
+  echo "render_treatment_report.py: not found - tried \$CLAUDE_PLUGIN_ROOT/skills/context-police/scripts/, ~/.claude/skills/context-police/scripts/, and the plugin cache"
+fi
 ```
+**Why three roots.** A plugin install lands under `~/.claude/plugins/cache/<marketplace>/context-police/<version>/`,
+so `~/.claude/skills/context-police/` does not exist and a single hardcoded root silently misses. `CLAUDE_PLUGIN_ROOT`
+does not rescue it on its own — it is often unset in the shell a step runs in, and it points at the *calling* plugin's
+root, so it can never reach a sibling. Four details in the snippet are load-bearing: rank on the **version segment
+alone** (`$(NF-4)`) because the marketplace segment precedes the version and a plain `sort -V` over whole paths would
+let `aaa-mkt/2.5.0` lose to `zzz-mkt/1.0.0`; use `find`, not a glob, because zsh's `nomatch` fails a non-matching glob
+*before* `2>/dev/null` can apply; guard **before** any `> "$OUT"` redirect, since the shell creates and truncates the
+file before the command runs and leaves a 0-byte file that reads as a real record; and say *"not found - tried
+&lt;paths&gt;"* rather than *"not installed"* — a failed lookup is not evidence about install state, and a bare "not
+installed" has already been misread by a human as proof a skill was absent.
+
 Verify the render with `browser_evaluate` over a served port (`file://` is blocked in MCP browser; the screenshot
 subsystem wedges) or `open` it on macOS.
 

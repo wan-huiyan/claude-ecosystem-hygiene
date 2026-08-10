@@ -17,7 +17,7 @@
       "name": "context-police",
       "source": "./plugins/context-police",
       "description": "Patrol the context budget: measure the skills/agents catalog token cost (injected every turn + into every subagent), trim it per-project (skillOverrides) or globally (disable-model-invocation), emit an interactive HTML recap, and curate episodic lessons out of the always-on catalog by description intent. The retrieval-hook-as-replacement idea was tested to ground and killed by a base-rate wall. Bundled from wan-huiyan/context-police.",
-      "version": "2.0.0"
+      "version": "2.4.0"
     },
     {
       "name": "ab-harness",
