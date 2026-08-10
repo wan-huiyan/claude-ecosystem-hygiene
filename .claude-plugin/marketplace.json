@@ -29,7 +29,7 @@
       "name": "memory-hygiene",
       "source": "./plugins/memory-hygiene",
       "description": "Audit and clean up Claude Code's persistent memory system \u2014 MEMORY.md, memory topic files, lessons, axioms, phase templates, ADRs, and the project docs/ taxonomy. v3.3 defines the canonical 7-bucket docs/ taxonomy session-handoff dispatches to and adds label-table integrity audit.",
-      "version": "3.3.0"
+      "version": "3.5.0"
     },
     {
       "name": "doc-freshness-reverse-lint",
