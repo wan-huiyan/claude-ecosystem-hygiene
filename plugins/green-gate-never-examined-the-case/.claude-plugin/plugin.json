@@ -1,0 +1,20 @@
+{
+  "name": "green-gate-never-examined-the-case",
+  "description": "A check reported clean without examining the case it exists for — \"green\" meant \"nothing ran\". Use when about to trust a gate, test or CI step you have never watched fail; when a guard is green but the bug it guards shipped anyway; when a check passes on a shallow clone, a disabled object, a malformed input or an empty result; or when a gate fires and you are about to satisfy it without asking what the wrong state already cost. Five measured mechanisms and a review checklist. The test: make it fail on purpose once, and check what the failure already cost before clearing it. NOT for measuring an existing suite's catch rate (test-effectiveness-auditor) or flaky tests.",
+  "version": "1.0.0",
+  "author": {
+    "name": "wan-huiyan",
+    "url": "https://github.com/wan-huiyan"
+  },
+  "repository": "https://github.com/wan-huiyan/claude-ecosystem-hygiene",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-code-skill",
+    "ci",
+    "gates",
+    "verification",
+    "hygiene",
+    "false-negative"
+  ]
+}
