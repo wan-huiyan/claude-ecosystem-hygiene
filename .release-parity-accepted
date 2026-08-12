@@ -1,0 +1,59 @@
+# Release-parity baseline — holes that exist and are ACCEPTED, with the reason.
+#
+# Read by .github/scripts/check_release_parity.py. One `version  # reason` per
+# line. Anything NOT listed here that has no GitHub Release is a hard CI failure.
+#
+# WHY A BASELINE AT ALL. This gate would otherwise ship red: 7 of the 16 versions
+# this repo has claimed to ship have no Release. A gate that cannot go green gets
+# muted inside a week, and a muted gate is worse than no gate — it looks like
+# coverage. So the existing holes are recorded here, once, and the gate then
+# fails only on NEW divergence.
+#
+# EVERY REASON BELOW IS VERIFIED, NOT PLAUSIBLE. A confident wrong note is what
+# the next person trusts instead of re-checking, which is why the repo this gate
+# came from records three of its own holes as "cause unestablished" rather than
+# guessing. This repo needs no such category — see below.
+#
+# THE MEASUREMENT, 2026-08-12, against origin/main @ a989d28:
+#
+#   309d720  2026-05-29  "ci: add structure validation + release-on-version-bump
+#                         automation (#10)"
+#            introduced BOTH `VERSION` (at 1.7.0) and `.github/workflows/release.yml`,
+#            in that one commit. Confirmed with --diff-filter=A on each path:
+#              git log --diff-filter=A -- VERSION                        -> 309d720
+#              git log --diff-filter=A -- .github/workflows/release.yml  -> 309d720
+#              git show 309d720:VERSION                                  -> 1.7.0
+#
+#   Every value VERSION has held since, and its release:
+#     1.7.0 (309d720, 2026-05-29) -> v1.7.0       1.10.2 (f3b06e21) -> v1.10.2
+#     1.8.0 (74822de8, 2026-06-01) -> v1.8.0      1.10.3 (1efc65a5) -> v1.10.3
+#     1.9.0 (a06ab8a3, 2026-06-05) -> v1.9.0      1.10.4 (cd79d78c) -> v1.10.4
+#     1.10.0 (5c70b4e0, 2026-07-03) -> v1.10.0    1.11.0 (a989d28d) -> v1.11.0
+#     1.10.1 (ebb228a8, 2026-08-05) -> v1.10.1
+#   Nine values, nine releases, no gaps. Git tags likewise start at v1.7.0, so
+#   there are no orphan tags-without-releases either.
+#
+# THE VERDICT THIS RECORDS. `release.yml` here carried the same
+# `paths: ['VERSION']` filter that lost v1.13.0 upstream, right up until the
+# commit that adds this file. It cost this repo NOTHING. Bug present, damage
+# none — and that was measured rather than assumed, because a guard telling you
+# a state is wrong does not tell you what the wrong state already cost.
+
+# --- pre-date both VERSION and the release automation ---
+# These seven are in the README's `## Version History` only. VERSION never held
+# any of them — it did not exist — and no release automation existed either;
+# 309d720 introduced both on 2026-05-29, and the newest of these shipped
+# 2026-04-25, five weeks earlier. Unreachable, and legitimately so.
+#
+# NOT "cause unestablished": unlike the upstream baseline's 1.3.0/1.4.0/1.5.0,
+# where release.yml demonstrably existed and the misses are unexplained, here the
+# workflow's own introducing commit set VERSION to 1.7.0 and v1.7.0 has a
+# release. There is no window in which automation existed and a release was
+# missed.
+1.0.0  # 2026-04-16; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.1.0  # 2026-04-17; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.2.0  # 2026-04-24; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.3.0  # 2026-04-24; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.4.0  # 2026-04-24; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.5.0  # 2026-04-24; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)
+1.6.0  # 2026-04-25; pre-dates VERSION and release.yml (both introduced in 309d720, 2026-05-29)

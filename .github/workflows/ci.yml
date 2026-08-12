@@ -9,7 +9,15 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 is REQUIRED by the release-parity gate. The default
+      # shallow clone (depth 1) makes `git log --follow VERSION` see one commit,
+      # so the VERSION-history half of that gate's union silently contributes
+      # nothing and only the README changelog half does any work. Measured
+      # upstream: the gate saw 26 claimed versions on a shallow runner against
+      # 28 locally, and stayed green — a dead input, not a failure.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Validate marketplace + plugin structure
         run: python3 .github/scripts/validate_plugins.py
       - name: Gate SKILL.md descriptions against the skill-listing cap
@@ -17,3 +25,12 @@ jobs:
         # trigger phrase past the cut is silently dead. Exit 1 = at least one
         # skill over cap. --triggers prints the phrases truncation destroys.
         run: python3 .github/scripts/check_skill_descriptions.py . --triggers
+      - name: Release-parity gate (a claimed version with no release)
+        # Looks BACKWARDS, which nothing else here does: every check above asks
+        # whether the tree is consistent now. This asks whether a release that
+        # should have been cut ever was. release.yml cannot answer that — both
+        # branches of its create step exit 0, so its `success` is byte-identical
+        # whether it cut a release or skipped one.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/check_release_parity.py .
